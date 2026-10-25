@@ -16,12 +16,16 @@ COVERED = {
 # Not wrapped on purpose: dashboard-session endpoints, the public playground,
 # health, and surfaces the SDK does not cover yet.
 IGNORED = {
-    "claim_upload", "dashboard_upload", "playground_upload", "health_check",
+    "claim_upload", "dashboard_upload", "playground_upload", "health_check", "serve_image",
     "list_collections", "get_collection", "close_collection",
     "start_export", "get_export_job", "download_export",
 }
 
-with urllib.request.urlopen("https://api.pixelvault.dev/openapi.json") as res:
+req = urllib.request.Request(
+    "https://api.pixelvault.dev/openapi.json",
+    headers={"User-Agent": "pixelvault-sdk-python-ci"},
+)
+with urllib.request.urlopen(req) as res:
     spec = json.load(res)
 
 live = {
