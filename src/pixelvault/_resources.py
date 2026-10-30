@@ -38,6 +38,27 @@ def sign_url(image_id: str, expires_in: Optional[int]) -> Request:
     return Request("POST", f"/v1/images/{seg(image_id)}/sign-url", json=body)
 
 
+def generate(
+    prompt: str,
+    model: Optional[str],
+    folder: Optional[str],
+    visibility: Optional[str],
+    expires_in: Optional[int],
+    sign_expires_in: Optional[int],
+) -> Request:
+    body = drop_none(
+        {
+            "prompt": prompt,
+            "model": model,
+            "folder": folder,
+            "visibility": visibility,
+            "expires_in": expires_in,
+            "sign_expires_in": sign_expires_in,
+        }
+    )
+    return Request("POST", "/v1/images/generate", json=body)
+
+
 def get_usage() -> Request:
     return Request("GET", "/v1/usage")
 

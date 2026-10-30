@@ -20,9 +20,24 @@ class Image(TypedDict):
     filename: str
     folder: Optional[str]
     created_at: str
+    #: Keyed public raster images: the same image as WebP/AVIF, usually far smaller.
+    optimized_url: NotRequired[str]
     #: Present only on auto-expiring uploads.
     expires_in: NotRequired[int]
     temporary: NotRequired[bool]
+
+
+class Generation(TypedDict):
+    """What an ``images.generate`` call cost."""
+
+    model: str
+    credits_charged: int
+    #: Credits left this month (they reset on the 1st, UTC).
+    credits_remaining: int
+
+
+class GeneratedImage(Image):
+    generation: Generation
 
 
 class ListMeta(TypedDict):
@@ -52,6 +67,12 @@ class UsageLimits(TypedDict):
     bandwidth_bytes_per_month: int
 
 
+class GenerationUsage(TypedDict):
+    credits_used: int
+    credits_limit: int
+    credits_remaining: int
+
+
 class Usage(TypedDict):
     plan: str
     period: str
@@ -59,6 +80,8 @@ class Usage(TypedDict):
     usage: UsageCounts
     limits: UsageLimits
     remaining: UsageCounts
+    #: AI image-generation credits for the month (images.generate).
+    generation: NotRequired[GenerationUsage]
 
 
 class ApiKey(TypedDict):
