@@ -207,3 +207,97 @@ async def test_async_error():
         with pytest.raises(PixelVaultError) as e:
             await pv.usage.get()
     assert e.value.code == "missing_api_key"
+
+
+GENERATED = {
+    **IMG,
+    "optimized_url": "https://img.pixelvault.dev/p/i.png?fmt=auto&q=85",
+    "generation": {"model": "flux-1-schnell", "credits_charged": 1, "credits_remaining": 9},
+}
+
+
+def test_generate_posts_json_and_returns_generation():
+    seen = {}
+
+    def handler(req: httpx.Request):
+        seen["req"] = req
+        return httpx.Response(201, json={"data": GENERATED})
+
+    img = make(handler).images.generate(
+        "a red bicycle", model="lucid-origin", folder="heroes", expires_in=3600
+    )
+    req = seen["req"]
+    assert req.method == "POST"
+    assert str(req.url) == "https://api.pixelvault.dev/v1/images/generate"
+    assert req.headers["authorization"] == "Bearer pv_live_test"
+    assert req.headers["content-type"].startswith("application/json")
+    assert json.loads(req.content) == {
+        "prompt": "a red bicycle",
+        "model": "lucid-origin",
+        "folder": "heroes",
+        "expires_in": 3600,
+    }
+    assert img["generation"]["credits_remaining"] == 9
+    assert img["optimized_url"].endswith("fmt=auto&q=85")
+
+
+def test_generate_omits_unset_options():
+    seen = {}
+
+    def handler(req: httpx.Request):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(201, json={"data": GENERATED})
+
+    make(handler).images.generate("a lake")
+    assert seen["body"] == {"prompt": "a lake"}
+
+
+def test_generate_credit_errors_carry_the_api_code():
+    def handler(req: httpx.Request):
+        return httpx.Response(
+            402,
+            json={"error": {"code": "generation_credits_exhausted", "message": "0 left"}},
+        )
+
+    with pytest.raises(PixelVaultError) as exc:
+        make(handler).images.generate("x")
+    assert exc.value.status == 402
+    assert exc.value.code == "generation_credits_exhausted"
+
+
+def test_generate_is_not_retried_after_a_5xx():
+    calls = []
+
+    def handler(req: httpx.Request):
+        calls.append(1)
+        return httpx.Response(
+            502, json={"error": {"code": "generation_failed", "message": "try again"}}
+        )
+
+    with pytest.raises(PixelVaultError) as exc:
+        make(handler).images.generate("x")
+    assert exc.value.code == "generation_failed"
+    assert len(calls) == 1  # a lost response must never spend credits twice
+
+
+def test_usage_exposes_generation_credits():
+    usage = {
+        "plan": "free",
+        "generation": {"credits_used": 1, "credits_limit": 10, "credits_remaining": 9},
+    }
+    got = make(lambda r: httpx.Response(200, json={"data": usage})).usage.get()
+    assert got["generation"]["credits_remaining"] == 9
+
+
+@pytest.mark.asyncio
+async def test_async_generate():
+    seen = {}
+
+    def handler(req: httpx.Request):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(201, json={"data": GENERATED})
+
+    async with amake(handler) as pv:
+        img = await pv.images.generate("a mountain", visibility="private")
+    assert seen["body"] == {"prompt": "a mountain", "visibility": "private"}
+    assert img["generation"]["model"] == "flux-1-schnell"

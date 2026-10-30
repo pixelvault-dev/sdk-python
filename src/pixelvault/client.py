@@ -23,6 +23,7 @@ from .types import (
     ApiKey,
     CreatedKey,
     DeviceLoginResult,
+    GeneratedImage,
     Image,
     ImagePage,
     JsonDict,
@@ -163,6 +164,28 @@ class _Images:
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
         )
+        return r.data(self._c._send(req))  # type: ignore[no-any-return]
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        model: Optional[str] = None,
+        folder: Optional[str] = None,
+        visibility: Optional[str] = None,
+        expires_in: Optional[int] = None,
+        sign_expires_in: Optional[int] = None,
+    ) -> GeneratedImage:
+        """Generate an image from ``prompt`` and host it in one call.
+
+        Spends credits from the account's monthly grant (``model`` defaults to
+        ``flux-1-schnell``, 1 credit; the Leonardo models cost 20 and need a paid plan).
+        The result is a normal image plus ``["generation"]`` with the credits charged and left.
+        Needs a secret key and a verified email. A failed generation is refunded, and a
+        lost response is never retried, so it cannot be charged twice. A call can take
+        several seconds (up to about a minute), so keep ``timeout`` generous.
+        """
+        req = r.generate(prompt, model, folder, visibility, expires_in, sign_expires_in)
         return r.data(self._c._send(req))  # type: ignore[no-any-return]
 
     def upload_batch(
@@ -315,6 +338,19 @@ class _AsyncImages:
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
         )
+        return r.data(await self._c._send(req))  # type: ignore[no-any-return]
+
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        model: Optional[str] = None,
+        folder: Optional[str] = None,
+        visibility: Optional[str] = None,
+        expires_in: Optional[int] = None,
+        sign_expires_in: Optional[int] = None,
+    ) -> GeneratedImage:
+        req = r.generate(prompt, model, folder, visibility, expires_in, sign_expires_in)
         return r.data(await self._c._send(req))  # type: ignore[no-any-return]
 
     async def upload_batch(
