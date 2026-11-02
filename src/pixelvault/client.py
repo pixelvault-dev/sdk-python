@@ -150,6 +150,7 @@ class _Images:
         sign_expires_in: Optional[int] = None,
         expires_in: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        describe: bool = False,
     ) -> Image:
         """Upload bytes, a path or a file object, or import a remote ``url``.
 
@@ -157,6 +158,11 @@ class _Images:
         ``metadata`` (a JSON object, up to 50 top-level keys / 4 KB) is stored with the image
         and filterable via ``list(metadata=...)``; it needs an API key and is ignored if the
         upload returns an existing image (use ``update_metadata``).
+
+        ``describe=True`` generates an AI description (alt text, caption, OCR text) in the
+        background (secret key + verified email; free 20 in total, Starter 1,000/mo, Pro 10,000/mo).
+        The returned image has ``["description"]["status"] == "pending"`` (or ``["describe_skipped"]``);
+        use ``wait_for_description(id)``.
         """
         req = r.upload(
             file=file,
@@ -168,6 +174,7 @@ class _Images:
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
             metadata=metadata,
+            describe=describe,
         )
         return r.data(self._c._send(req))  # type: ignore[no-any-return]
 
@@ -204,22 +211,43 @@ class _Images:
         page: Optional[int] = None,
         per_page: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        q: Optional[str] = None,
     ) -> ImagePage:
         """One page of images. ``metadata`` keeps only images whose custom metadata contains
-        every key/value given (typed match; nested objects match by containment)."""
-        return r.page(self._c._send(r.list_images(page, per_page, metadata)), page, per_page)
+        every key/value given (typed match; nested objects match by containment). ``q`` is a
+        full-text search over the AI description (alt text, caption, OCR text), best match first."""
+        return r.page(self._c._send(r.list_images(page, per_page, metadata, q)), page, per_page)
 
     def list_all(
-        self, per_page: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None
+        self,
+        per_page: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        q: Optional[str] = None,
     ) -> Iterator[Image]:
         """Iterate every image across pages."""
         page_no = 1
         while True:
-            result = self.list(page_no, per_page, metadata)
+            result = self.list(page_no, per_page, metadata, q)
             yield from result["data"]
             if not r.has_more(result, page_no):
                 return
             page_no += 1
+
+    def wait_for_description(
+        self, image_id: str, timeout: float = 40.0, interval: float = 2.0
+    ) -> Optional[Dict[str, Any]]:
+        """Wait for an AI description (``upload(describe=True)``) to finish.
+
+        Returns the final description (``done`` or ``failed``), the last ``pending`` state when
+        ``timeout`` seconds run out, or ``None`` if the image has no description. The API reports
+        a description whose job never finished as ``failed``, so a lost job can't wait forever.
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            desc = self.get(image_id).get("description")
+            if not desc or desc.get("status") != "pending" or time.monotonic() >= deadline:
+                return desc
+            time.sleep(interval)
 
     def get(self, image_id: str) -> Image:
         return r.data(self._c._send(r.get_image(image_id)))  # type: ignore[no-any-return]
@@ -353,6 +381,7 @@ class _AsyncImages:
         sign_expires_in: Optional[int] = None,
         expires_in: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        describe: bool = False,
     ) -> Image:
         req = r.upload(
             file=file,
@@ -364,6 +393,7 @@ class _AsyncImages:
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
             metadata=metadata,
+            describe=describe,
         )
         return r.data(await self._c._send(req))  # type: ignore[no-any-return]
 
@@ -390,22 +420,36 @@ class _AsyncImages:
         page: Optional[int] = None,
         per_page: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        q: Optional[str] = None,
     ) -> ImagePage:
         return r.page(
-            await self._c._send(r.list_images(page, per_page, metadata)), page, per_page
+            await self._c._send(r.list_images(page, per_page, metadata, q)), page, per_page
         )
 
     async def list_all(
-        self, per_page: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None
+        self,
+        per_page: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        q: Optional[str] = None,
     ) -> AsyncIterator[Image]:
         page_no = 1
         while True:
-            result = await self.list(page_no, per_page, metadata)
+            result = await self.list(page_no, per_page, metadata, q)
             for image in result["data"]:
                 yield image
             if not r.has_more(result, page_no):
                 return
             page_no += 1
+
+    async def wait_for_description(
+        self, image_id: str, timeout: float = 40.0, interval: float = 2.0
+    ) -> Optional[Dict[str, Any]]:
+        deadline = time.monotonic() + timeout
+        while True:
+            desc = (await self.get(image_id)).get("description")
+            if not desc or desc.get("status") != "pending" or time.monotonic() >= deadline:
+                return desc
+            await asyncio.sleep(interval)
 
     async def get(self, image_id: str) -> Image:
         return r.data(await self._c._send(r.get_image(image_id)))  # type: ignore[no-any-return]

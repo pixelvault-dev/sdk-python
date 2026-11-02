@@ -13,7 +13,7 @@ import httpx
 
 from .errors import PixelVaultError
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 DEFAULT_BASE_URL = "https://api.pixelvault.dev"
 MAX_BACKOFF = 30.0
@@ -62,6 +62,7 @@ def upload_request(
     sign_expires_in: Optional[int],
     expires_in: Optional[int],
     metadata: Optional[Dict[str, Any]] = None,
+    describe: bool = False,
 ) -> Request:
     if (file is None) == (url is None):
         raise ValueError("pass exactly one of `file` or `url`")
@@ -81,6 +82,8 @@ def upload_request(
         body: Dict[str, Any] = {"url": url, **fields}
         if meta is not None:
             body["metadata"] = meta
+        if describe:
+            body["describe"] = True
         return Request("POST", "/v1/images", json=body)
 
     assert file is not None
@@ -103,6 +106,7 @@ def upload_request(
         data={
             **{k: str(v) for k, v in fields.items()},
             **({"metadata": json.dumps(meta)} if meta is not None else {}),
+            **({"describe": "true"} if describe else {}),
         },
     )
 

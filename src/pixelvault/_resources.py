@@ -23,13 +23,17 @@ def batch(collection: Dict[str, Any], images: List[Dict[str, Any]]) -> Request:
 
 
 def list_images(
-    page: Optional[int], per_page: Optional[int], metadata: Optional[Dict[str, Any]] = None
+    page: Optional[int],
+    per_page: Optional[int],
+    metadata: Optional[Dict[str, Any]] = None,
+    q: Optional[str] = None,
 ) -> Request:
     params = drop_none(
         {
             "page": page,
             "per_page": per_page,
             "metadata": json.dumps(metadata) if metadata else None,
+            "q": q if q and q.strip() else None,
         }
     )
     return Request("GET", "/v1/images", params=params)

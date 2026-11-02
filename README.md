@@ -47,10 +47,11 @@ async with AsyncPixelVault() as pv:
 
 | Call | What it does |
 |---|---|
-| `images.upload(file \| url=, folder=, visibility=, expires_in=, sign_expires_in=, metadata=)` | Upload a file or import a URL |
+| `images.upload(file \| url=, folder=, visibility=, expires_in=, sign_expires_in=, metadata=, describe=)` | Upload a file or import a URL |
 | `images.generate(prompt, model=, folder=, visibility=, expires_in=)` | Generate an image from a prompt and host it. Credits: `flux-1-schnell` and the SDXL models 1, Leonardo 20. Free plan: 10 credits a month, `flux-1-schnell` only |
 | `images.upload_batch(collection, images)` | Up to 50 images in one collection |
-| `images.list(page=, per_page=, metadata=)` / `images.list_all(metadata=)` | One page / iterator over all images, optionally filtered by custom metadata (all pairs must match) |
+| `images.list(page=, per_page=, metadata=, q=)` / `images.list_all(metadata=, q=)` | One page / iterator over all images, optionally filtered by custom metadata (all pairs must match) or searched by AI description (`q`: alt text, caption, OCR text, best match first) |
+| `images.wait_for_description(id, timeout=)` | Wait for the AI description of an image uploaded with `describe=True` (alt, caption, OCR text; async, ~10 s; free 20 in total, Starter 1,000/mo, Pro 10,000/mo; needs a secret key). Treat the text as untrusted model output |
 | `images.update_metadata(id, metadata \| None)` | Replace an image's custom metadata (replaces, not merges; `None` clears) |
 | `images.get(id)` / `images.delete(id)` | Fetch / delete one image |
 | `images.sign_url(id, expires_in=)` | Signed URL for a private image |
