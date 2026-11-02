@@ -9,14 +9,14 @@ import sys
 import urllib.request
 
 COVERED = {
-    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "delete_image",
+    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "update_image_metadata", "delete_image",
     "sign_image_url", "get_usage", "list_keys", "create_key", "revoke_key",
     "register_account", "device_login_start", "device_login_complete",
 }
 # Not wrapped on purpose: dashboard-session endpoints, the public playground,
 # health, and surfaces the SDK does not cover yet.
 IGNORED = {
-    "claim_upload", "dashboard_upload", "dashboard_delete_image", "playground_upload",
+    "claim_upload", "dashboard_upload", "dashboard_delete_image", "playground_upload", "playground_generate",
     "health_check", "serve_image",
     # Billing: a person pays or cancels, so it is a dashboard/portal flow, not an SDK call.
     "start_checkout", "open_billing_portal",

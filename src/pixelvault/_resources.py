@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import quote
 
@@ -21,8 +22,22 @@ def batch(collection: Dict[str, Any], images: List[Dict[str, Any]]) -> Request:
     return batch_request(collection, images)
 
 
-def list_images(page: Optional[int], per_page: Optional[int]) -> Request:
-    return Request("GET", "/v1/images", params=drop_none({"page": page, "per_page": per_page}))
+def list_images(
+    page: Optional[int], per_page: Optional[int], metadata: Optional[Dict[str, Any]] = None
+) -> Request:
+    params = drop_none(
+        {
+            "page": page,
+            "per_page": per_page,
+            "metadata": json.dumps(metadata) if metadata else None,
+        }
+    )
+    return Request("GET", "/v1/images", params=params)
+
+
+def update_metadata(image_id: str, metadata: Optional[Dict[str, Any]]) -> Request:
+    # Not drop_none: an explicit None must reach the API as JSON null (clears it).
+    return Request("PATCH", f"/v1/images/{seg(image_id)}", json={"metadata": metadata})
 
 
 def get_image(image_id: str) -> Request:
