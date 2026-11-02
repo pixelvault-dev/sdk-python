@@ -366,3 +366,75 @@ async def test_async_metadata_roundtrip():
     await pv.images.list(metadata={"env": "prod"})
     assert json.loads(seen[0].url.params["metadata"]) == {"env": "prod"}
     assert await pv.images.update_metadata("img_1", {"a": 1}) == {"a": 1}
+
+
+def test_describe_flag_multipart_and_json():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        return httpx.Response(201, json={"data": IMG})
+
+    pv = make(handler)
+    pv.images.upload(b"\x89PNG", filename="a.png", describe=True)
+    assert 'name="describe"' in seen[0].read().decode("latin-1")
+    pv.images.upload(b"\x89PNG", filename="a.png")
+    assert 'name="describe"' not in seen[1].read().decode("latin-1")
+    pv.images.upload(url="https://example.com/a.png", describe=True)
+    assert json.loads(seen[2].content)["describe"] is True
+    pv.images.upload(url="https://example.com/a.png")
+    assert "describe" not in json.loads(seen[3].content)
+
+
+def test_list_q_param():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        return httpx.Response(200, json={"data": [], "meta": {"total": 0, "page": 1, "per_page": 20}})
+
+    pv = make(handler)
+    pv.images.list(q="invoice 4821")
+    assert seen[0].url.params["q"] == "invoice 4821"
+    pv.images.list(q="  ")
+    assert "q" not in seen[1].url.params
+    list(pv.images.list_all(q="cat"))
+    assert seen[2].url.params["q"] == "cat"
+
+
+def test_wait_for_description_polls_until_done_and_gives_up():
+    states = [{"status": "pending"}, {"status": "pending"}, {"status": "done", "alt": "A cat"}]
+    calls = []
+
+    def handler(req: httpx.Request):
+        calls.append(req)
+        i = min(len(calls) - 1, len(states) - 1)
+        return httpx.Response(200, json={"data": {**IMG, "description": states[i]}})
+
+    pv = make(handler)
+    assert pv.images.wait_for_description("img_1", interval=0.001)["alt"] == "A cat"
+    assert len(calls) == 3
+
+    pv2 = make(lambda req: httpx.Response(200, json={"data": {**IMG, "description": {"status": "failed", "error": "describe_timeout"}}}))
+    assert pv2.images.wait_for_description("img_1", interval=0.001)["status"] == "failed"
+    pv3 = make(lambda req: httpx.Response(200, json={"data": {**IMG, "description": None}}))
+    assert pv3.images.wait_for_description("img_1", interval=0.001) is None
+    pv4 = make(lambda req: httpx.Response(200, json={"data": {**IMG, "description": {"status": "pending"}}}))
+    assert pv4.images.wait_for_description("img_1", timeout=0.01, interval=0.001)["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_async_describe_roundtrip():
+    states = [{"status": "pending"}, {"status": "done", "alt": "x"}]
+    calls = []
+
+    def handler(req: httpx.Request):
+        calls.append(req)
+        if req.method == "GET" and req.url.path.startswith("/v1/images/"):
+            return httpx.Response(200, json={"data": {**IMG, "description": states[min(len(calls) - 1, 1)]}})
+        return httpx.Response(200, json={"data": [], "meta": {"total": 0, "page": 1, "per_page": 20}})
+
+    pv = amake(handler)
+    await pv.images.list(q="invoice")
+    assert calls[0].url.params["q"] == "invoice"
+    assert (await pv.images.wait_for_description("img_1", interval=0.001))["alt"] == "x"

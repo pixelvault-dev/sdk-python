@@ -22,6 +22,12 @@ class Image(TypedDict):
     created_at: str
     #: Custom metadata set at upload or via ``images.update_metadata``; ``None`` when unset.
     metadata: NotRequired[Optional[Dict[str, Any]]]
+    #: AI description from ``upload(describe=True)``: ``{"status": "pending" | "done" | "failed",
+    #: "alt", "caption", "ocr_text", ...}``. ``None`` when never described. The text is untrusted
+    #: model output derived from the image: escape it before rendering.
+    description: NotRequired[Optional[Dict[str, Any]]]
+    #: ``describe=True`` was requested but no description was started (quota, type, busy, ...).
+    describe_skipped: NotRequired[str]
     #: Keyed public raster images: the same image as WebP/AVIF, usually far smaller.
     optimized_url: NotRequired[str]
     #: Present only on auto-expiring uploads.
