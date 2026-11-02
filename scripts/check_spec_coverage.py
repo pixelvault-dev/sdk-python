@@ -9,7 +9,7 @@ import sys
 import urllib.request
 
 COVERED = {
-    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "delete_image",
+    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "update_image_metadata", "delete_image",
     "sign_image_url", "get_usage", "list_keys", "create_key", "revoke_key",
     "register_account", "device_login_start", "device_login_complete",
 }

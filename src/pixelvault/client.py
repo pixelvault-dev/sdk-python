@@ -149,10 +149,14 @@ class _Images:
         visibility: Optional[str] = None,
         sign_expires_in: Optional[int] = None,
         expires_in: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Image:
         """Upload bytes, a path or a file object, or import a remote ``url``.
 
         Without an API key the upload is anonymous and expires after 30 days.
+        ``metadata`` (a JSON object, up to 50 top-level keys / 4 KB) is stored with the image
+        and filterable via ``list(metadata=...)``; it needs an API key and is ignored if the
+        upload returns an existing image (use ``update_metadata``).
         """
         req = r.upload(
             file=file,
@@ -163,6 +167,7 @@ class _Images:
             visibility=visibility,
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
+            metadata=metadata,
         )
         return r.data(self._c._send(req))  # type: ignore[no-any-return]
 
@@ -194,14 +199,23 @@ class _Images:
         """Up to 50 images in one collection. Fields use the API's snake_case names."""
         return r.data(self._c._send(r.batch(collection, images)))  # type: ignore[no-any-return]
 
-    def list(self, page: Optional[int] = None, per_page: Optional[int] = None) -> ImagePage:
-        return r.page(self._c._send(r.list_images(page, per_page)), page, per_page)
+    def list(
+        self,
+        page: Optional[int] = None,
+        per_page: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> ImagePage:
+        """One page of images. ``metadata`` keeps only images whose custom metadata contains
+        every key/value given (typed match; nested objects match by containment)."""
+        return r.page(self._c._send(r.list_images(page, per_page, metadata)), page, per_page)
 
-    def list_all(self, per_page: Optional[int] = None) -> Iterator[Image]:
+    def list_all(
+        self, per_page: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None
+    ) -> Iterator[Image]:
         """Iterate every image across pages."""
         page_no = 1
         while True:
-            result = self.list(page_no, per_page)
+            result = self.list(page_no, per_page, metadata)
             yield from result["data"]
             if not r.has_more(result, page_no):
                 return
@@ -209,6 +223,17 @@ class _Images:
 
     def get(self, image_id: str) -> Image:
         return r.data(self._c._send(r.get_image(image_id)))  # type: ignore[no-any-return]
+
+    def update_metadata(
+        self, image_id: str, metadata: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Replace an image's custom metadata and return the stored value.
+
+        The object REPLACES the stored one (it is not merged), so send every key to keep;
+        ``None`` clears it.
+        """
+        body = self._c._send(r.update_metadata(image_id, metadata))
+        return r.data(body).get("metadata")  # type: ignore[no-any-return]
 
     def delete(self, image_id: str) -> None:
         self._c._send(r.delete_image(image_id))
@@ -327,6 +352,7 @@ class _AsyncImages:
         visibility: Optional[str] = None,
         sign_expires_in: Optional[int] = None,
         expires_in: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Image:
         req = r.upload(
             file=file,
@@ -337,6 +363,7 @@ class _AsyncImages:
             visibility=visibility,
             sign_expires_in=sign_expires_in,
             expires_in=expires_in,
+            metadata=metadata,
         )
         return r.data(await self._c._send(req))  # type: ignore[no-any-return]
 
@@ -359,14 +386,21 @@ class _AsyncImages:
         return r.data(await self._c._send(r.batch(collection, images)))  # type: ignore[no-any-return]
 
     async def list(
-        self, page: Optional[int] = None, per_page: Optional[int] = None
+        self,
+        page: Optional[int] = None,
+        per_page: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> ImagePage:
-        return r.page(await self._c._send(r.list_images(page, per_page)), page, per_page)
+        return r.page(
+            await self._c._send(r.list_images(page, per_page, metadata)), page, per_page
+        )
 
-    async def list_all(self, per_page: Optional[int] = None) -> AsyncIterator[Image]:
+    async def list_all(
+        self, per_page: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None
+    ) -> AsyncIterator[Image]:
         page_no = 1
         while True:
-            result = await self.list(page_no, per_page)
+            result = await self.list(page_no, per_page, metadata)
             for image in result["data"]:
                 yield image
             if not r.has_more(result, page_no):
@@ -375,6 +409,12 @@ class _AsyncImages:
 
     async def get(self, image_id: str) -> Image:
         return r.data(await self._c._send(r.get_image(image_id)))  # type: ignore[no-any-return]
+
+    async def update_metadata(
+        self, image_id: str, metadata: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        body = await self._c._send(r.update_metadata(image_id, metadata))
+        return r.data(body).get("metadata")  # type: ignore[no-any-return]
 
     async def delete(self, image_id: str) -> None:
         await self._c._send(r.delete_image(image_id))

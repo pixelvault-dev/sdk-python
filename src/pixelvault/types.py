@@ -20,6 +20,8 @@ class Image(TypedDict):
     filename: str
     folder: Optional[str]
     created_at: str
+    #: Custom metadata set at upload or via ``images.update_metadata``; ``None`` when unset.
+    metadata: NotRequired[Optional[Dict[str, Any]]]
     #: Keyed public raster images: the same image as WebP/AVIF, usually far smaller.
     optimized_url: NotRequired[str]
     #: Present only on auto-expiring uploads.

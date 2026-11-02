@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import mimetypes
 import os
 from dataclasses import dataclass, field
@@ -12,7 +13,7 @@ import httpx
 
 from .errors import PixelVaultError
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 DEFAULT_BASE_URL = "https://api.pixelvault.dev"
 MAX_BACKOFF = 30.0
@@ -60,6 +61,7 @@ def upload_request(
     visibility: Optional[str],
     sign_expires_in: Optional[int],
     expires_in: Optional[int],
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> Request:
     if (file is None) == (url is None):
         raise ValueError("pass exactly one of `file` or `url`")
@@ -73,8 +75,13 @@ def upload_request(
         }
     )
 
+    meta = metadata if metadata else None  # an empty object means "no metadata"
+
     if url is not None:
-        return Request("POST", "/v1/images", json={"url": url, **fields})
+        body: Dict[str, Any] = {"url": url, **fields}
+        if meta is not None:
+            body["metadata"] = meta
+        return Request("POST", "/v1/images", json=body)
 
     assert file is not None
     content: bytes
@@ -93,7 +100,10 @@ def upload_request(
         "POST",
         "/v1/images",
         files={"file": (name, content, mime)},
-        data={k: str(v) for k, v in fields.items()},
+        data={
+            **{k: str(v) for k, v in fields.items()},
+            **({"metadata": json.dumps(meta)} if meta is not None else {}),
+        },
     )
 
 

@@ -301,3 +301,68 @@ async def test_async_generate():
         img = await pv.images.generate("a mountain", visibility="private")
     assert seen["body"] == {"prompt": "a mountain", "visibility": "private"}
     assert img["generation"]["model"] == "flux-1-schnell"
+
+
+def test_upload_metadata_multipart_and_json():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        return httpx.Response(201, json={"data": IMG})
+
+    pv = make(handler)
+    pv.images.upload(b"\x89PNG", filename="a.png", metadata={"env": "prod", "n": 3})
+    body = seen[0].read().decode("latin-1")
+    assert 'name="metadata"' in body and '{"env": "prod", "n": 3}' in body
+
+    pv.images.upload(url="https://example.com/a.png", metadata={"a": 1})
+    assert json.loads(seen[1].content)["metadata"] == {"a": 1}
+
+    pv.images.upload(url="https://example.com/a.png", metadata={})
+    assert "metadata" not in json.loads(seen[2].content)
+
+
+def test_list_metadata_filter_param_and_list_all():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        return httpx.Response(200, json={"data": [], "meta": {"total": 0, "page": 1, "per_page": 20}})
+
+    pv = make(handler)
+    pv.images.list(metadata={"env": "prod"})
+    assert json.loads(seen[0].url.params["metadata"]) == {"env": "prod"}
+    pv.images.list(metadata={})
+    assert "metadata" not in seen[1].url.params
+    list(pv.images.list_all(metadata={"a": 1}))
+    assert json.loads(seen[2].url.params["metadata"]) == {"a": 1}
+
+
+def test_update_metadata_patches_and_clears():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        return httpx.Response(200, json={"data": {"id": "img_1", "metadata": json.loads(req.content)["metadata"]}})
+
+    pv = make(handler)
+    assert pv.images.update_metadata("img_1", {"a": 1}) == {"a": 1}
+    assert seen[0].method == "PATCH" and seen[0].url.path == "/v1/images/img_1"
+    assert pv.images.update_metadata("img_1", None) is None
+    assert json.loads(seen[1].content) == {"metadata": None}
+
+
+@pytest.mark.asyncio
+async def test_async_metadata_roundtrip():
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req)
+        if req.method == "PATCH":
+            return httpx.Response(200, json={"data": {"id": "img_1", "metadata": {"a": 1}}})
+        return httpx.Response(200, json={"data": [], "meta": {"total": 0, "page": 1, "per_page": 20}})
+
+    pv = amake(handler)
+    await pv.images.list(metadata={"env": "prod"})
+    assert json.loads(seen[0].url.params["metadata"]) == {"env": "prod"}
+    assert await pv.images.update_metadata("img_1", {"a": 1}) == {"a": 1}
