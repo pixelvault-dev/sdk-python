@@ -17,6 +17,8 @@ COVERED = {
 # health, and surfaces the SDK does not cover yet.
 IGNORED = {
     "claim_upload", "dashboard_upload", "dashboard_delete_image", "playground_upload", "playground_generate",
+    # The web dashboard's session-JWT endpoints (an API key is rejected): list/search, AI descriptions, AI tags.
+    "dashboard_list_images", "dashboard_describe_image", "dashboard_list_tags",
     "health_check", "serve_image",
     # Billing: a person pays or cancels, so it is a dashboard/portal flow, not an SDK call.
     "start_checkout", "open_billing_portal",
