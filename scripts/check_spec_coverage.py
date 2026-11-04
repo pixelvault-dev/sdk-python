@@ -16,7 +16,7 @@ COVERED = {
 # Not wrapped on purpose: dashboard-session endpoints, the public playground,
 # health, and surfaces the SDK does not cover yet.
 IGNORED = {
-    "claim_upload", "dashboard_upload", "dashboard_delete_image", "playground_upload", "playground_generate",
+    "claim_upload", "dashboard_upload", "dashboard_delete_image", "dashboard_list_images", "playground_upload", "playground_generate",
     "health_check", "serve_image",
     # Billing: a person pays or cancels, so it is a dashboard/portal flow, not an SDK call.
     "start_checkout", "open_billing_portal",
