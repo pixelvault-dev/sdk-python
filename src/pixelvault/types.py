@@ -189,6 +189,41 @@ class VideoPage(TypedDict):
     meta: ListMeta
 
 
+class Audio(TypedDict):
+    id: str
+    kind: Literal["audio"]
+    url: str
+    original_url: str
+    visibility: Literal["public", "private"]
+    mime_type: Literal["audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg"]
+    size: int
+    container: Literal["mp3", "wav", "m4a", "ogg"]
+    codec: Literal["mp3", "pcm", "pcm_float", "aac", "opus", "vorbis"]
+    duration_seconds: float
+    sample_rate: int
+    channels: int
+    filename: str
+    folder: Optional[str]
+    collection_id: Optional[str]
+    metadata: Optional[Dict[str, Any]]
+    created_at: str
+    expires_at: NotRequired[str]
+    temporary: NotRequired[bool]
+    signed_expires: NotRequired[int]
+    replayed: NotRequired[bool]
+
+
+class AudioPage(TypedDict):
+    data: List[Audio]
+    meta: ListMeta
+
+
+class AudioSignedUrl(TypedDict):
+    url: str
+    expires: int
+    visibility: Literal["public", "private"]
+
+
 class VideoUploadSession(TypedDict):
     upload_id: str
     asset_id: str
@@ -220,6 +255,7 @@ class ExportStart(TypedDict):
     status: str
     image_count: int
     video_count: int
+    audio_count: int
     asset_count: int
     status_url: str
 
@@ -229,6 +265,7 @@ class ExportJob(TypedDict):
     status: str
     image_count: int
     video_count: int
+    audio_count: int
     asset_count: int
     processed_count: int
     bytes: int

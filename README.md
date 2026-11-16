@@ -41,6 +41,16 @@ result = pv.videos.wait_for_enrichment(video["id"], timeout=600)
 print(result["video"]["original_url"])
 print(result["video"]["enrichment"].get("transcript"))
 print(result["video"]["enrichment"].get("storyboard"))
+
+audio = pv.audio.upload(
+    "episode.m4a",
+    visibility="private",
+    sign_expires_in=3600,
+    expires_in=604800,
+    idempotency_key="episode-v1",
+)
+print(audio["id"], audio["url"], audio["codec"], audio["duration_seconds"])
+fresh = pv.audio.sign_url(audio["id"], expires_in=3600)
 ```
 
 Asyncio:
@@ -74,11 +84,20 @@ async with AsyncPixelVault() as pv:
 | `videos.sign_url(id, expires_in=)` | Fresh private original, poster and available artifact URLs |
 | `videos.optimize(id)` / `enrich(id)` | Start asynchronous optimization or transcript/storyboard enrichment |
 | `videos.wait_for_optimization(id, ...)` / `wait_for_enrichment(id, ...)` | Bounded polling with backoff; returns video, terminal/current status and `timed_out` |
-| `exports.start()` / `wait(job_id)` / `download(job_id)` | Owner-authenticated tar export of non-expired images, videos, available derivatives and `manifest.json` relationships |
+| `audio.upload(file \| url=, ...)` | Host original MP3, PCM/float WAV, AAC M4A, or Opus/Vorbis OGG with privacy, TTL, metadata, organization, and retry safety |
+| `audio.get(id)` / `list(...)` / `list_all(...)` / `delete(id)` | Audio discovery and lifecycle by stable `aud_` ID |
+| `audio.update(id, metadata=, folder=, collection_id=)` / `sign_url(id, expires_in=)` | Replace organization fields or mint a fresh private original URL |
+| `exports.start()` / `wait(job_id)` / `download(job_id)` | Owner-authenticated tar export of non-expired images, videos, audio originals, available derivatives and `manifest.json` relationships |
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
 | `register(email)` | Create an account, returns a first key once |
 | `device_login_start(email)` + `device_login_complete(email, code)` | Passwordless key minting |
+
+Audio originals have an approved global maximum of 25,000,000 bytes; this is not
+a plan allowance. PixelVault validates actual container/codec bytes and preserves
+the original without transcoding. Audio editing, conversion, streaming manifests,
+and transcription are intentionally unsupported. Sync and asyncio clients expose
+the same audio methods.
 
 ## Errors and retries
 
@@ -97,8 +116,9 @@ except PixelVaultError as err:
 
 The client retries `429` (honoring `Retry-After` up to 30 seconds) and, for `GET`/`DELETE` only, `5xx` and
 network errors. Uploads, job creation and `images.generate` are not retried after a `5xx` or network error.
-Use an `idempotency_key` for replay-safe video direct/import/resumable uploads. A wait timing out locally does
-not cancel the server job. Tune with `max_retries` (default 2) and `timeout` (seconds, default 60).
+Use an `idempotency_key` for replay-safe audio and video direct/import uploads (and video resumable uploads).
+A wait timing out locally does not cancel the server job. Tune with `max_retries` (default 2) and `timeout`
+(seconds, default 60).
 
 ## License
 

@@ -13,7 +13,7 @@ import httpx
 
 from .errors import PixelVaultError
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 DEFAULT_BASE_URL = "https://api.pixelvault.dev"
 MAX_BACKOFF = 30.0

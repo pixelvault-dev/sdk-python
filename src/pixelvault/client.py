@@ -20,6 +20,7 @@ from ._core import (
 )
 from .errors import PixelVaultError
 from .videos import AsyncVideos, Videos
+from .audio import AsyncAudioFiles, AudioFiles
 from .exports import AsyncExports, Exports
 from .types import (
     ApiKey,
@@ -88,6 +89,7 @@ class PixelVault:
         self.images = _Images(self)
         self.exports = Exports(self)
         self.videos = Videos(self)
+        self.audio = AudioFiles(self)
         self.usage = _Usage(self)
         self.keys = _Keys(self)
 
@@ -324,6 +326,7 @@ class AsyncPixelVault:
         self.images = _AsyncImages(self)
         self.exports = AsyncExports(self)
         self.videos = AsyncVideos(self)
+        self.audio = AsyncAudioFiles(self)
         self.usage = _AsyncUsage(self)
         self.keys = _AsyncKeys(self)
 
