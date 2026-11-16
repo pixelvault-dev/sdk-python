@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pixelvault"
-version = "0.5.0"
+version = "0.5.1"
 description = "Official Python SDK for PixelVault, agent-first media hosting"
 readme = "README.md"
 license = "MIT"

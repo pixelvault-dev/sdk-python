@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 import sys
 
@@ -73,12 +73,32 @@ class UsageLimits(TypedDict):
     storage_bytes: int
     uploads_per_month: int
     bandwidth_bytes_per_month: int
+    transforms_per_month: NotRequired[int]
+
+
+class BandwidthUsage(TypedDict):
+    """CDN bandwidth preflight. Null values are unknown/not applicable, never zero."""
+
+    status: Literal["available", "unavailable", "unlimited"]
+    used: Optional[int]
+    remaining: Optional[int]
+    limit: Optional[int]
+    unit: Literal["bytes"]
+    accounting_period: str
+    resets_at: str
+    measured_at: Optional[str]
+    freshness: Literal["near_real_time", "delayed", "unavailable", "not_applicable"]
 
 
 class GenerationUsage(TypedDict):
     credits_used: int
     credits_limit: int
     credits_remaining: int
+
+class VideoSecondsUsage(TypedDict):
+    seconds_used: int
+    seconds_limit: int
+    seconds_remaining: int
 
 
 class Usage(TypedDict):
@@ -90,6 +110,10 @@ class Usage(TypedDict):
     remaining: UsageCounts
     #: AI image-generation credits for the month (images.generate).
     generation: NotRequired[GenerationUsage]
+    editing: NotRequired[GenerationUsage]
+    bandwidth: NotRequired[BandwidthUsage]
+    video_optimization: NotRequired[VideoSecondsUsage]
+    video_enrichment: NotRequired[VideoSecondsUsage]
 
 
 class ApiKey(TypedDict):
