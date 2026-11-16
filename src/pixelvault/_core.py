@@ -32,6 +32,7 @@ class Request:
     data: Optional[Dict[str, str]] = None
     content: Optional[bytes] = None
     headers: Dict[str, str] = field(default_factory=dict)
+    response_bytes: bool = False
     no_auth: bool = False
 
 

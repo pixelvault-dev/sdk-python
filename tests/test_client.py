@@ -650,3 +650,85 @@ async def test_async_video_import_resumable_and_wait():
         result = await pv.videos.wait_for_enrichment("vid_1", timeout=0)
     assert imported["id"] == resumed["id"] == "vid_1"
     assert result["status"] == "failed" and result["timed_out"] is False
+
+
+def test_exports_start_wait_and_download_bytes():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        if req.url.path == "/v1/export":
+            return httpx.Response(
+                202,
+                json={
+                    "job_id": "exp_1",
+                    "status": "pending",
+                    "image_count": 2,
+                    "video_count": 1,
+                    "asset_count": 3,
+                    "status_url": "/v1/export-jobs/exp_1",
+                },
+            )
+        if req.url.path.endswith("/download"):
+            return httpx.Response(200, content=b"tar!", headers={"content-type": "application/x-tar"})
+        return httpx.Response(
+            200,
+            json={
+                "id": "exp_1",
+                "status": "complete",
+                "image_count": 2,
+                "video_count": 1,
+                "asset_count": 3,
+                "processed_count": 3,
+                "bytes": 4,
+                "created_at": "2026-11-16T00:00:00Z",
+                "expires_at": "2026-11-17T00:00:00Z",
+                "download_url": "/v1/export-jobs/exp_1/download",
+            },
+        )
+
+    pv = make(handler)
+    started = pv.exports.start(project_id="proj_1")
+    waited = pv.exports.wait(started["job_id"], project_id="proj_1", timeout=0)
+    archive = pv.exports.download(started["job_id"], project_id="proj_1")
+    assert started["video_count"] == 1
+    assert waited["job"]["status"] == "complete" and waited["timed_out"] is False
+    assert archive == b"tar!"
+    assert all(req.url.params["project_id"] == "proj_1" for req in seen)
+    assert seen[2].headers["accept"] == "application/x-tar"
+
+
+@pytest.mark.asyncio
+async def test_async_exports_timeout_is_local():
+    def handler(req):
+        if req.url.path == "/v1/export":
+            return httpx.Response(
+                202,
+                json={
+                    "job_id": "exp_1",
+                    "status": "pending",
+                    "image_count": 0,
+                    "video_count": 1,
+                    "asset_count": 1,
+                    "status_url": "/v1/export-jobs/exp_1",
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "id": "exp_1",
+                "status": "processing",
+                "image_count": 0,
+                "video_count": 1,
+                "asset_count": 1,
+                "processed_count": 0,
+                "bytes": 0,
+                "created_at": "2026-11-16T00:00:00Z",
+                "expires_at": "2026-11-17T00:00:00Z",
+            },
+        )
+
+    async with amake(handler) as pv:
+        started = await pv.exports.start()
+        result = await pv.exports.wait(started["job_id"], timeout=0)
+    assert result["job"]["status"] == "processing" and result["timed_out"] is True

@@ -74,6 +74,7 @@ async with AsyncPixelVault() as pv:
 | `videos.sign_url(id, expires_in=)` | Fresh private original, poster and available artifact URLs |
 | `videos.optimize(id)` / `enrich(id)` | Start asynchronous optimization or transcript/storyboard enrichment |
 | `videos.wait_for_optimization(id, ...)` / `wait_for_enrichment(id, ...)` | Bounded polling with backoff; returns video, terminal/current status and `timed_out` |
+| `exports.start()` / `wait(job_id)` / `download(job_id)` | Owner-authenticated tar export of non-expired images, videos, available derivatives and `manifest.json` relationships |
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
 | `register(email)` | Create an account, returns a first key once |

@@ -189,3 +189,31 @@ class VideoWaitResult(TypedDict):
     video: Video
     status: str
     timed_out: bool
+
+
+class ExportStart(TypedDict):
+    job_id: str
+    status: str
+    image_count: int
+    video_count: int
+    asset_count: int
+    status_url: str
+
+
+class ExportJob(TypedDict):
+    id: str
+    status: str
+    image_count: int
+    video_count: int
+    asset_count: int
+    processed_count: int
+    bytes: int
+    created_at: str
+    expires_at: str
+    download_url: NotRequired[str]
+    error: NotRequired[str]
+
+
+class ExportWaitResult(TypedDict):
+    job: ExportJob
+    timed_out: bool
