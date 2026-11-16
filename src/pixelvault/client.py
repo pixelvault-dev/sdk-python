@@ -19,6 +19,8 @@ from ._core import (
     retryable,
 )
 from .errors import PixelVaultError
+from .videos import AsyncVideos, Videos
+from .exports import AsyncExports, Exports
 from .types import (
     ApiKey,
     CreatedKey,
@@ -53,13 +55,18 @@ class _Config:
             json=req.json,
             files=req.files,
             data=req.data,
+            content=req.content,
             headers=headers_for(self.api_key, req),
             timeout=self.timeout,
         )
         return built
 
 
-def _body(res: httpx.Response) -> Dict[str, Any]:
+def _body(res: httpx.Response, response_bytes: bool = False) -> Any:
+    if response_bytes:
+        return res.content
+    if not res.content:
+        return {}
     body: Dict[str, Any] = res.json()
     return body
 
@@ -79,6 +86,8 @@ class PixelVault:
         self._cfg = _Config(api_key, base_url, max_retries, timeout)
         self._http = http_client or httpx.Client()
         self.images = _Images(self)
+        self.exports = Exports(self)
+        self.videos = Videos(self)
         self.usage = _Usage(self)
         self.keys = _Keys(self)
 
@@ -91,7 +100,7 @@ class PixelVault:
     def close(self) -> None:
         self._http.close()
 
-    def _send(self, req: Request) -> Dict[str, Any]:
+    def _send(self, req: Request) -> Any:
         attempt = 0
         while True:
             try:
@@ -103,7 +112,7 @@ class PixelVault:
                     continue
                 raise network_error(exc) from exc
             if res.is_success:
-                return _body(res)
+                return _body(res, req.response_bytes)
             if attempt < self._cfg.max_retries and retryable(req.method, res.status_code):
                 wait = backoff(attempt, res)
                 if wait is not None:
@@ -313,6 +322,8 @@ class AsyncPixelVault:
         self._cfg = _Config(api_key, base_url, max_retries, timeout)
         self._http = http_client or httpx.AsyncClient()
         self.images = _AsyncImages(self)
+        self.exports = AsyncExports(self)
+        self.videos = AsyncVideos(self)
         self.usage = _AsyncUsage(self)
         self.keys = _AsyncKeys(self)
 
@@ -325,7 +336,7 @@ class AsyncPixelVault:
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def _send(self, req: Request) -> Dict[str, Any]:
+    async def _send(self, req: Request) -> Any:
         attempt = 0
         while True:
             try:
@@ -337,7 +348,7 @@ class AsyncPixelVault:
                     continue
                 raise network_error(exc) from exc
             if res.is_success:
-                return _body(res)
+                return _body(res, req.response_bytes)
             if attempt < self._cfg.max_retries and retryable(req.method, res.status_code):
                 wait = backoff(attempt, res)
                 if wait is not None:

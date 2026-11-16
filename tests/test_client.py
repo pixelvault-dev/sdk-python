@@ -438,3 +438,309 @@ async def test_async_describe_roundtrip():
     await pv.images.list(q="invoice")
     assert calls[0].url.params["q"] == "invoice"
     assert (await pv.images.wait_for_description("img_1", interval=0.001))["alt"] == "x"
+
+
+VIDEO = {
+    "id": "vid_1",
+    "kind": "video",
+    "url": "https://img.pixelvault.dev/p/vid_1.mp4",
+    "original_url": "https://img.pixelvault.dev/p/vid_1.mp4",
+    "visibility": "public",
+    "mime_type": "video/mp4",
+    "size": 3,
+    "width": 1920,
+    "height": 1080,
+    "duration_seconds": 2.0,
+    "video_codec": "h264",
+    "audio_codec": "aac",
+    "has_audio": True,
+    "fast_start": True,
+    "social_compatible": True,
+    "compatibility_warnings": [],
+    "social_optimization": {"status": "not_requested"},
+    "enrichment": {"status": "not_requested"},
+    "filename": "clip.mp4",
+    "folder": None,
+    "collection_id": None,
+    "metadata": None,
+    "created_at": "2026-11-16T00:00:00Z",
+}
+
+
+def test_video_upload_bytes_sends_lifecycle_and_idempotency_headers():
+    seen = {}
+
+    def handler(req):
+        seen["request"] = req
+        return httpx.Response(201, json={"data": VIDEO})
+
+    video = make(handler).videos.upload(
+        b"mp4",
+        filename="hello world.mp4",
+        visibility="private",
+        sign_expires_in=300,
+        expires_in=3600,
+        folder="demos",
+        collection_id="col_1",
+        metadata={"env": "test"},
+        social_ready=True,
+        idempotency_key="retry-1",
+        sha256="abc123",
+    )
+    req = seen["request"]
+    assert video["id"] == "vid_1"
+    assert req.content == b"mp4"
+    assert req.headers["x-pixelvault-filename"] == "hello%20world.mp4"
+    assert req.headers["x-pixelvault-visibility"] == "private"
+    assert req.headers["x-pixelvault-sign-expires-in"] == "300"
+    assert req.headers["x-pixelvault-expires-in"] == "3600"
+    assert req.headers["x-pixelvault-folder"] == "demos"
+    assert req.headers["x-pixelvault-collection-id"] == "col_1"
+    assert json.loads(req.headers["x-pixelvault-metadata"]) == {"env": "test"}
+    assert req.headers["idempotency-key"] == "retry-1"
+    assert req.headers["x-pixelvault-content-sha256"] == "abc123"
+
+
+def test_video_import_is_json_and_replay_safe():
+    seen = {}
+
+    def handler(req):
+        seen["request"] = req
+        return httpx.Response(201, json={"data": VIDEO})
+
+    make(handler).videos.upload(
+        url="https://example.com/clip.mp4",
+        filename="clip.mp4",
+        metadata={"source": "demo"},
+        idempotency_key="import-1",
+    )
+    req = seen["request"]
+    assert req.headers["idempotency-key"] == "import-1"
+    assert json.loads(req.content) == {
+        "url": "https://example.com/clip.mp4",
+        "filename": "clip.mp4",
+        "metadata": {"source": "demo"},
+    }
+
+
+def test_video_resumable_upload_and_abort():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        path = req.url.path
+        if path == "/v1/videos/uploads":
+            return httpx.Response(
+                201,
+                json={
+                    "data": {
+                        "upload_id": "vup_1",
+                        "asset_id": "vid_1",
+                        "part_size": 2,
+                        "size": 3,
+                        "visibility": "private",
+                        "expires_at": "2026-11-16T01:00:00Z",
+                    }
+                },
+            )
+        if "/parts/" in path:
+            number = int(path.rsplit("/", 1)[1])
+            return httpx.Response(
+                200,
+                json={"data": {"part_number": number, "etag": str(number), "received": len(req.content)}},
+            )
+        if path.endswith("/complete"):
+            return httpx.Response(201, json={"data": VIDEO})
+        if req.method == "DELETE":
+            return httpx.Response(204)
+        raise AssertionError(path)
+
+    pv = make(handler)
+    video = pv.videos.upload_resumable(
+        b"abc", filename="clip.mp4", visibility="private", idempotency_key="resume-1"
+    )
+    pv.videos.abort_upload("vup_old")
+    assert video["id"] == "vid_1"
+    assert [request.method for request in seen] == ["POST", "PUT", "PUT", "POST", "DELETE"]
+    assert seen[0].headers["idempotency-key"] == "resume-1"
+    assert json.loads(seen[0].content)["sha256"] == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    assert seen[1].headers["x-pixelvault-part-sha256"]
+    assert seen[2].content == b"c"
+
+
+def test_video_lifecycle_jobs_filters_and_wait_states():
+    seen = []
+    states = [
+        {**VIDEO, "enrichment": {"status": "complete", "job_id": "ven_1"}},
+        {**VIDEO, "social_optimization": {"status": "processing", "job_id": "vop_1"}},
+    ]
+
+    def handler(req):
+        seen.append(req)
+        if req.method == "DELETE":
+            return httpx.Response(204)
+        if req.url.path == "/v1/videos" and req.method == "GET":
+            return httpx.Response(
+                200, json={"data": [VIDEO], "meta": {"total": 1, "page": 1, "per_page": 20}}
+            )
+        if req.url.path.endswith("/sign-url"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "url": "https://signed.example/video.mp4?sig=x",
+                        "enrichment": VIDEO["enrichment"],
+                        "expires": 123,
+                    }
+                },
+            )
+        if req.method == "GET":
+            return httpx.Response(200, json={"data": states.pop(0)})
+        return httpx.Response(200, json={"data": VIDEO})
+
+    pv = make(handler)
+    page = pv.videos.list(folder="demos", collection_id="col_1", metadata={"env": "test"})
+    pv.videos.update("vid_1", metadata=None, folder="archive", collection_id=None)
+    signed = pv.videos.sign_url("vid_1", 300)
+    pv.videos.optimize("vid_1")
+    pv.videos.enrich("vid_1")
+    pv.videos.analyze("vid_1")
+    pv.videos.create_poster("vid_1")
+    pv.videos.delete("vid_1")
+    complete = pv.videos.wait_for_enrichment("vid_1", timeout=0)
+    timed_out = pv.videos.wait_for_optimization("vid_1", timeout=0)
+    assert page["meta"]["total"] == 1
+    assert json.loads(seen[0].url.params["metadata"]) == {"env": "test"}
+    assert json.loads(seen[1].content) == {
+        "metadata": None,
+        "folder": "archive",
+        "collection_id": None,
+    }
+    assert signed["url"] == "https://signed.example/video.mp4?sig=x"
+    assert complete["status"] == "complete" and complete["timed_out"] is False
+    assert timed_out["status"] == "processing" and timed_out["timed_out"] is True
+
+
+@pytest.mark.asyncio
+async def test_async_video_import_resumable_and_wait():
+    calls = []
+    states = [{**VIDEO, "enrichment": {"status": "failed", "job_id": "ven_1"}}]
+
+    def handler(req):
+        calls.append(req)
+        if req.url.path == "/v1/videos" and req.method == "POST":
+            return httpx.Response(201, json={"data": VIDEO})
+        if req.url.path == "/v1/videos/uploads":
+            return httpx.Response(
+                201,
+                json={
+                    "data": {
+                        "upload_id": "vup_1",
+                        "asset_id": "vid_1",
+                        "part_size": 8,
+                        "size": 3,
+                        "visibility": "public",
+                        "expires_at": "2026-11-16T01:00:00Z",
+                    }
+                },
+            )
+        if "/parts/" in req.url.path:
+            return httpx.Response(
+                200, json={"data": {"part_number": 1, "etag": "a", "received": 3}}
+            )
+        if req.url.path.endswith("/complete"):
+            return httpx.Response(201, json={"data": VIDEO})
+        if req.method == "GET":
+            return httpx.Response(200, json={"data": states.pop(0)})
+        raise AssertionError(req.url.path)
+
+    async with amake(handler) as pv:
+        imported = await pv.videos.upload(url="https://example.com/clip.mp4")
+        resumed = await pv.videos.upload_resumable(
+            b"abc", filename="clip.mp4", idempotency_key="async-1"
+        )
+        result = await pv.videos.wait_for_enrichment("vid_1", timeout=0)
+    assert imported["id"] == resumed["id"] == "vid_1"
+    assert result["status"] == "failed" and result["timed_out"] is False
+
+
+def test_exports_start_wait_and_download_bytes():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        if req.url.path == "/v1/export":
+            return httpx.Response(
+                202,
+                json={
+                    "job_id": "exp_1",
+                    "status": "pending",
+                    "image_count": 2,
+                    "video_count": 1,
+                    "asset_count": 3,
+                    "status_url": "/v1/export-jobs/exp_1",
+                },
+            )
+        if req.url.path.endswith("/download"):
+            return httpx.Response(200, content=b"tar!", headers={"content-type": "application/x-tar"})
+        return httpx.Response(
+            200,
+            json={
+                "id": "exp_1",
+                "status": "complete",
+                "image_count": 2,
+                "video_count": 1,
+                "asset_count": 3,
+                "processed_count": 3,
+                "bytes": 4,
+                "created_at": "2026-11-16T00:00:00Z",
+                "expires_at": "2026-11-17T00:00:00Z",
+                "download_url": "/v1/export-jobs/exp_1/download",
+            },
+        )
+
+    pv = make(handler)
+    started = pv.exports.start(project_id="proj_1")
+    waited = pv.exports.wait(started["job_id"], project_id="proj_1", timeout=0)
+    archive = pv.exports.download(started["job_id"], project_id="proj_1")
+    assert started["video_count"] == 1
+    assert waited["job"]["status"] == "complete" and waited["timed_out"] is False
+    assert archive == b"tar!"
+    assert all(req.url.params["project_id"] == "proj_1" for req in seen)
+    assert seen[2].headers["accept"] == "application/x-tar"
+
+
+@pytest.mark.asyncio
+async def test_async_exports_timeout_is_local():
+    def handler(req):
+        if req.url.path == "/v1/export":
+            return httpx.Response(
+                202,
+                json={
+                    "job_id": "exp_1",
+                    "status": "pending",
+                    "image_count": 0,
+                    "video_count": 1,
+                    "asset_count": 1,
+                    "status_url": "/v1/export-jobs/exp_1",
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "id": "exp_1",
+                "status": "processing",
+                "image_count": 0,
+                "video_count": 1,
+                "asset_count": 1,
+                "processed_count": 0,
+                "bytes": 0,
+                "created_at": "2026-11-16T00:00:00Z",
+                "expires_at": "2026-11-17T00:00:00Z",
+            },
+        )
+
+    async with amake(handler) as pv:
+        started = await pv.exports.start()
+        result = await pv.exports.wait(started["job_id"], timeout=0)
+    assert result["job"]["status"] == "processing" and result["timed_out"] is True

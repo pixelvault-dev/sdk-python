@@ -9,9 +9,13 @@ import sys
 import urllib.request
 
 COVERED = {
-    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "update_image_metadata", "delete_image",
-    "sign_image_url", "get_usage", "list_keys", "create_key", "revoke_key",
+    "upload_image", "generate_image", "batch_upload", "list_images", "get_image", "update_image_metadata",
+    "delete_image", "sign_image_url", "get_usage", "list_keys", "create_key", "revoke_key",
     "register_account", "device_login_start", "device_login_complete",
+    "list_videos", "upload_video", "get_video", "delete_video", "update_video", "optimize_video",
+    "enrich_video", "analyze_video", "generate_video_poster", "sign_video_url",
+    "create_video_upload", "upload_video_part", "complete_video_upload", "abort_video_upload",
+    "start_export", "get_export_job", "download_export",
 }
 # Not wrapped on purpose: dashboard-session endpoints, the public playground,
 # health, and surfaces the SDK does not cover yet.
@@ -23,7 +27,11 @@ IGNORED = {
     # Billing: a person pays or cancels, so it is a dashboard/portal flow, not an SDK call.
     "start_checkout", "open_billing_portal",
     "list_collections", "get_collection", "close_collection",
-    "start_export", "get_export_job", "download_export",
+    # Advanced image, webhook, and anonymous-playground surfaces are intentionally separate.
+    "describe_image", "edit_image", "list_image_tags", "playground_video_upload",
+    "list_webhooks", "create_webhook", "update_webhook", "delete_webhook",
+    "rotate_webhook_secret", "list_webhook_deliveries",
+
 }
 
 req = urllib.request.Request(
