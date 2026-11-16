@@ -683,6 +683,147 @@ async def test_async_video_import_resumable_and_wait():
     assert result["status"] == "failed" and result["timed_out"] is False
 
 
+AUDIO = {
+    "id": "aud_1",
+    "kind": "audio",
+    "url": "https://img.pixelvault.dev/p/aud_1.mp3",
+    "original_url": "https://img.pixelvault.dev/p/aud_1.mp3",
+    "visibility": "public",
+    "mime_type": "audio/mpeg",
+    "size": 3,
+    "container": "mp3",
+    "codec": "mp3",
+    "duration_seconds": 1.25,
+    "sample_rate": 44_100,
+    "channels": 2,
+    "filename": "clip.mp3",
+    "folder": None,
+    "collection_id": None,
+    "metadata": None,
+    "created_at": "2026-11-16T00:00:00Z",
+}
+
+
+def test_audio_upload_sends_content_lifecycle_and_idempotency_headers():
+    seen = {}
+
+    def handler(req):
+        seen["request"] = req
+        return httpx.Response(201, json={"data": AUDIO})
+
+    audio = make(handler).audio.upload(
+        b"ogg",
+        filename="hello world.ogg",
+        visibility="private",
+        sign_expires_in=300,
+        expires_in=3600,
+        folder="episodes",
+        collection_id="col_1",
+        metadata={"season": 1},
+        idempotency_key="audio-retry-1",
+        sha256="abc123",
+    )
+    req = seen["request"]
+    assert audio["id"] == "aud_1"
+    assert req.content == b"ogg"
+    assert req.headers["content-type"] == "audio/ogg"
+    assert req.headers["x-pixelvault-filename"] == "hello%20world.ogg"
+    assert req.headers["x-pixelvault-visibility"] == "private"
+    assert req.headers["x-pixelvault-sign-expires-in"] == "300"
+    assert req.headers["x-pixelvault-expires-in"] == "3600"
+    assert req.headers["x-pixelvault-folder"] == "episodes"
+    assert req.headers["x-pixelvault-collection-id"] == "col_1"
+    assert json.loads(req.headers["x-pixelvault-metadata"]) == {"season": 1}
+    assert req.headers["idempotency-key"] == "audio-retry-1"
+    assert req.headers["x-pixelvault-content-sha256"] == "abc123"
+
+
+def test_audio_import_lifecycle_filters_signing_and_delete():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        if req.method == "DELETE":
+            return httpx.Response(204)
+        if req.url.path == "/v1/audio" and req.method == "GET":
+            return httpx.Response(
+                200, json={"data": [AUDIO], "meta": {"total": 1, "page": 1, "per_page": 20}}
+            )
+        if req.url.path.endswith("/sign-url"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "url": "https://signed.example/audio.mp3?sig=x",
+                        "expires": 123,
+                        "visibility": "private",
+                    }
+                },
+            )
+        return httpx.Response(201 if req.method == "POST" else 200, json={"data": AUDIO})
+
+    pv = make(handler)
+    pv.audio.upload(
+        url="https://example.com/clip.mp3",
+        filename="clip.mp3",
+        metadata={"source": "demo"},
+        idempotency_key="audio-import-1",
+    )
+    pv.audio.get("aud/1")
+    page = pv.audio.list(folder="episodes", collection_id="col_1", metadata={"season": 1})
+    pv.audio.update("aud_1", metadata=None, folder="archive", collection_id=None)
+    signed = pv.audio.sign_url("aud_1", 300)
+    pv.audio.delete("aud_1")
+
+    assert json.loads(seen[0].content)["url"] == "https://example.com/clip.mp3"
+    assert seen[0].headers["idempotency-key"] == "audio-import-1"
+    assert seen[1].url.raw_path == b"/v1/audio/aud%2F1"
+    assert json.loads(seen[2].url.params["metadata"]) == {"season": 1}
+    assert json.loads(seen[3].content) == {
+        "metadata": None,
+        "folder": "archive",
+        "collection_id": None,
+    }
+    assert page["meta"]["total"] == 1
+    assert signed["expires"] == 123
+
+
+@pytest.mark.asyncio
+async def test_async_audio_upload_and_get():
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        return httpx.Response(201 if req.method == "POST" else 200, json={"data": AUDIO})
+
+    async with amake(handler) as pv:
+        imported = await pv.audio.upload(url="https://example.com/clip.m4a")
+        fetched = await pv.audio.get("aud_1")
+    assert imported["id"] == fetched["id"] == "aud_1"
+    assert calls[0].url.path == "/v1/audio"
+
+
+def test_audio_rejects_an_unknown_direct_format_before_network_io():
+    def handler(_req):
+        raise AssertionError("network should not be called")
+
+    with pytest.raises(ValueError, match="mp3, .wav, .m4a, or .ogg"):
+        make(handler).audio.upload(b"not audio", filename="clip.bin")
+
+def test_audio_rejects_a_direct_original_above_the_approved_ceiling(tmp_path):
+    path = tmp_path / "oversized.mp3"
+    with path.open("wb") as stream:
+        stream.seek(25_000_000)
+        stream.write(b"0")
+
+    def handler(_req):
+        raise AssertionError("network should not be called")
+
+    with pytest.raises(ValueError, match="25,000,000 bytes"):
+        make(handler).audio.upload(path)
+
+
+
 def test_exports_start_wait_and_download_bytes():
     seen = []
 
@@ -696,7 +837,8 @@ def test_exports_start_wait_and_download_bytes():
                     "status": "pending",
                     "image_count": 2,
                     "video_count": 1,
-                    "asset_count": 3,
+                    "audio_count": 1,
+                    "asset_count": 4,
                     "status_url": "/v1/export-jobs/exp_1",
                 },
             )
@@ -709,8 +851,9 @@ def test_exports_start_wait_and_download_bytes():
                 "status": "complete",
                 "image_count": 2,
                 "video_count": 1,
-                "asset_count": 3,
-                "processed_count": 3,
+                "audio_count": 1,
+                "asset_count": 4,
+                "processed_count": 4,
                 "bytes": 4,
                 "created_at": "2026-11-16T00:00:00Z",
                 "expires_at": "2026-11-17T00:00:00Z",
@@ -723,6 +866,7 @@ def test_exports_start_wait_and_download_bytes():
     waited = pv.exports.wait(started["job_id"], project_id="proj_1", timeout=0)
     archive = pv.exports.download(started["job_id"], project_id="proj_1")
     assert started["video_count"] == 1
+    assert started["audio_count"] == 1
     assert waited["job"]["status"] == "complete" and waited["timed_out"] is False
     assert archive == b"tar!"
     assert all(req.url.params["project_id"] == "proj_1" for req in seen)
@@ -740,6 +884,7 @@ async def test_async_exports_timeout_is_local():
                     "status": "pending",
                     "image_count": 0,
                     "video_count": 1,
+                    "audio_count": 0,
                     "asset_count": 1,
                     "status_url": "/v1/export-jobs/exp_1",
                 },
@@ -751,6 +896,7 @@ async def test_async_exports_timeout_is_local():
                 "status": "processing",
                 "image_count": 0,
                 "video_count": 1,
+                "audio_count": 0,
                 "asset_count": 1,
                 "processed_count": 0,
                 "bytes": 0,
