@@ -217,3 +217,11 @@ class ExportJob(TypedDict):
 class ExportWaitResult(TypedDict):
     job: ExportJob
     timed_out: bool
+
+
+class VideoSignedUrls(TypedDict):
+    url: str
+    enrichment: Dict[str, Any]
+    expires: int
+    poster_url: NotRequired[str]
+    social_url: NotRequired[str]

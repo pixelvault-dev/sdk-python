@@ -12,7 +12,14 @@ from typing import Any, AsyncIterator, BinaryIO, Dict, Iterator, Optional, Tuple
 from urllib.parse import quote
 
 from ._core import FileInput, Request, drop_none
-from .types import Video, VideoPage, VideoUploadedPart, VideoUploadSession, VideoWaitResult
+from .types import (
+    Video,
+    VideoPage,
+    VideoSignedUrls,
+    VideoUploadedPart,
+    VideoUploadSession,
+    VideoWaitResult,
+)
 
 
 def _seg(value: str) -> str:
@@ -425,13 +432,15 @@ class Videos:
     def delete(self, video_id: str) -> None:
         self._c._send(Request("DELETE", f"/v1/videos/{_seg(video_id)}"))
 
-    def sign_url(self, video_id: str, expires_in: Optional[int] = None) -> Video:
+    def sign_url(
+        self, video_id: str, expires_in: Optional[int] = None
+    ) -> VideoSignedUrls:
         req = Request(
             "POST",
             f"/v1/videos/{_seg(video_id)}/sign-url",
             json=drop_none({"expires_in": expires_in}),
         )
-        return cast(Video, self._c._send(req)["data"])
+        return cast(VideoSignedUrls, self._c._send(req)["data"])
 
     def optimize(self, video_id: str) -> Video:
         return self._job(video_id, "optimize")
@@ -685,13 +694,15 @@ class AsyncVideos:
     async def delete(self, video_id: str) -> None:
         await self._c._send(Request("DELETE", f"/v1/videos/{_seg(video_id)}"))
 
-    async def sign_url(self, video_id: str, expires_in: Optional[int] = None) -> Video:
+    async def sign_url(
+        self, video_id: str, expires_in: Optional[int] = None
+    ) -> VideoSignedUrls:
         req = Request(
             "POST",
             f"/v1/videos/{_seg(video_id)}/sign-url",
             json=drop_none({"expires_in": expires_in}),
         )
-        return cast(Video, (await self._c._send(req))["data"])
+        return cast(VideoSignedUrls, (await self._c._send(req))["data"])
 
     async def optimize(self, video_id: str) -> Video:
         return await self._job(video_id, "optimize")

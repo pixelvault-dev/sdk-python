@@ -583,6 +583,17 @@ def test_video_lifecycle_jobs_filters_and_wait_states():
             return httpx.Response(
                 200, json={"data": [VIDEO], "meta": {"total": 1, "page": 1, "per_page": 20}}
             )
+        if req.url.path.endswith("/sign-url"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "url": "https://signed.example/video.mp4?sig=x",
+                        "enrichment": VIDEO["enrichment"],
+                        "expires": 123,
+                    }
+                },
+            )
         if req.method == "GET":
             return httpx.Response(200, json={"data": states.pop(0)})
         return httpx.Response(200, json={"data": VIDEO})
@@ -590,7 +601,7 @@ def test_video_lifecycle_jobs_filters_and_wait_states():
     pv = make(handler)
     page = pv.videos.list(folder="demos", collection_id="col_1", metadata={"env": "test"})
     pv.videos.update("vid_1", metadata=None, folder="archive", collection_id=None)
-    pv.videos.sign_url("vid_1", 300)
+    signed = pv.videos.sign_url("vid_1", 300)
     pv.videos.optimize("vid_1")
     pv.videos.enrich("vid_1")
     pv.videos.analyze("vid_1")
@@ -605,6 +616,7 @@ def test_video_lifecycle_jobs_filters_and_wait_states():
         "folder": "archive",
         "collection_id": None,
     }
+    assert signed["url"] == "https://signed.example/video.mp4?sig=x"
     assert complete["status"] == "complete" and complete["timed_out"] is False
     assert timed_out["status"] == "processing" and timed_out["timed_out"] is True
 
