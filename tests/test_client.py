@@ -280,13 +280,32 @@ def test_generate_is_not_retried_after_a_5xx():
     assert len(calls) == 1  # a lost response must never spend credits twice
 
 
-def test_usage_exposes_generation_credits():
+def test_usage_exposes_credits_video_quota_and_honest_bandwidth():
     usage = {
         "plan": "free",
         "generation": {"credits_used": 1, "credits_limit": 10, "credits_remaining": 9},
+        "video_optimization": {
+            "seconds_used": 11,
+            "seconds_limit": 120,
+            "seconds_remaining": 109,
+        },
+        "bandwidth": {
+            "status": "unavailable",
+            "used": None,
+            "remaining": None,
+            "limit": 1_073_741_824,
+            "unit": "bytes",
+            "accounting_period": "2026-11",
+            "resets_at": "2026-12-01T00:00:00.000Z",
+            "measured_at": None,
+            "freshness": "unavailable",
+        },
     }
     got = make(lambda r: httpx.Response(200, json={"data": usage})).usage.get()
     assert got["generation"]["credits_remaining"] == 9
+    assert got["video_optimization"]["seconds_remaining"] == 109
+    assert got["bandwidth"]["used"] is None
+    assert got["bandwidth"]["limit"] == 1_073_741_824
 
 
 @pytest.mark.asyncio
