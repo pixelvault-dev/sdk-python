@@ -14,6 +14,7 @@ COVERED = {
     "register_account", "device_login_start", "device_login_complete",
     "list_videos", "upload_video", "get_video", "delete_video", "update_video", "optimize_video",
     "enrich_video", "analyze_video", "generate_video_poster", "sign_video_url",
+    "upload_audio", "list_audio", "get_audio", "update_audio", "sign_audio_url", "delete_audio",
     "create_video_upload", "upload_video_part", "complete_video_upload", "abort_video_upload",
     "start_export", "get_export_job", "download_export",
 }
