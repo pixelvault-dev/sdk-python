@@ -19,6 +19,7 @@ from ._core import (
     retryable,
 )
 from .errors import PixelVaultError
+from .videos import AsyncVideos, Videos
 from .types import (
     ApiKey,
     CreatedKey,
@@ -53,6 +54,7 @@ class _Config:
             json=req.json,
             files=req.files,
             data=req.data,
+            content=req.content,
             headers=headers_for(self.api_key, req),
             timeout=self.timeout,
         )
@@ -60,6 +62,8 @@ class _Config:
 
 
 def _body(res: httpx.Response) -> Dict[str, Any]:
+    if not res.content:
+        return {}
     body: Dict[str, Any] = res.json()
     return body
 
@@ -79,6 +83,7 @@ class PixelVault:
         self._cfg = _Config(api_key, base_url, max_retries, timeout)
         self._http = http_client or httpx.Client()
         self.images = _Images(self)
+        self.videos = Videos(self)
         self.usage = _Usage(self)
         self.keys = _Keys(self)
 
@@ -313,6 +318,7 @@ class AsyncPixelVault:
         self._cfg = _Config(api_key, base_url, max_retries, timeout)
         self._http = http_client or httpx.AsyncClient()
         self.images = _AsyncImages(self)
+        self.videos = AsyncVideos(self)
         self.usage = _AsyncUsage(self)
         self.keys = _AsyncKeys(self)
 

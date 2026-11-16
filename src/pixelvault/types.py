@@ -126,3 +126,66 @@ class DeviceLoginResult(TypedDict):
 
 # Registration and batch responses are passed through as plain dicts.
 JsonDict = Dict[str, Any]
+
+
+class Video(TypedDict):
+    id: str
+    kind: str
+    url: str
+    original_url: str
+    visibility: str
+    mime_type: str
+    size: int
+    width: Optional[int]
+    height: Optional[int]
+    duration_seconds: Optional[float]
+    video_codec: Optional[str]
+    audio_codec: Optional[str]
+    has_audio: Optional[bool]
+    fast_start: Optional[bool]
+    social_compatible: Optional[bool]
+    compatibility_warnings: List[Dict[str, Any]]
+    social_optimization: Dict[str, Any]
+    enrichment: Dict[str, Any]
+    filename: str
+    folder: Optional[str]
+    collection_id: Optional[str]
+    metadata: Optional[Dict[str, Any]]
+    created_at: str
+    social_ready_url: NotRequired[str]
+    poster_url: NotRequired[str]
+    expires_at: NotRequired[str]
+    temporary: NotRequired[bool]
+    replayed: NotRequired[bool]
+    signed_expires: NotRequired[int]
+
+
+class VideoPage(TypedDict):
+    data: List[Video]
+    meta: ListMeta
+
+
+class VideoUploadSession(TypedDict):
+    upload_id: str
+    asset_id: str
+    part_size: int
+    size: int
+    visibility: str
+    expires_at: str
+    asset_expires_at: NotRequired[str]
+    replayed: NotRequired[bool]
+    completed: NotRequired[bool]
+    asset: NotRequired[Video]
+
+
+class VideoUploadedPart(TypedDict):
+    part_number: int
+    etag: str
+    received: int
+    replayed: NotRequired[bool]
+
+
+class VideoWaitResult(TypedDict):
+    video: Video
+    status: str
+    timed_out: bool

@@ -13,7 +13,7 @@ import httpx
 
 from .errors import PixelVaultError
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 DEFAULT_BASE_URL = "https://api.pixelvault.dev"
 MAX_BACKOFF = 30.0
@@ -30,6 +30,8 @@ class Request:
     json: Optional[Dict[str, Any]] = None
     files: Optional[Dict[str, Tuple[str, Any, str]]] = None
     data: Optional[Dict[str, str]] = None
+    content: Optional[bytes] = None
+    headers: Dict[str, str] = field(default_factory=dict)
     no_auth: bool = False
 
 
@@ -45,6 +47,7 @@ def headers_for(api_key: Optional[str], req: Request) -> Dict[str, str]:
     headers = {
         "Accept": "application/json",
         "X-PixelVault-Client": f"sdk-python/{__version__}",
+        **req.headers,
     }
     if api_key and not req.no_auth:
         headers["Authorization"] = f"Bearer {api_key}"

@@ -1,6 +1,6 @@
 # pixelvault
 
-Official Python SDK for [PixelVault](https://pixelvault.dev), agent-first image hosting.
+Official Python SDK for [PixelVault](https://pixelvault.dev), agent-first media hosting.
 Sync and asyncio clients on top of `httpx`. Python 3.9+.
 
 ```bash
@@ -30,6 +30,17 @@ Generate an image from a prompt and host it in one call (spends monthly credits,
 image = pv.images.generate("flat vector hero, a robot at a laptop, no text")
 print(image["url"])         # https://img.pixelvault.dev/...
 print(image["generation"])  # {'model': 'flux-1-schnell', 'credits_charged': 1, 'credits_remaining': 9}
+
+video = pv.videos.upload(
+    "demo.mp4",
+    idempotency_key="upload-attempt-42",
+    visibility="private",
+)
+pv.videos.enrich(video["id"])
+result = pv.videos.wait_for_enrichment(video["id"], timeout=600)
+print(result["video"]["original_url"])
+print(result["video"]["enrichment"].get("transcript"))
+print(result["video"]["enrichment"].get("storyboard"))
 ```
 
 Asyncio:
@@ -55,6 +66,14 @@ async with AsyncPixelVault() as pv:
 | `images.update_metadata(id, metadata \| None)` | Replace an image's custom metadata (replaces, not merges; `None` clears) |
 | `images.get(id)` / `images.delete(id)` | Fetch / delete one image |
 | `images.sign_url(id, expires_in=)` | Signed URL for a private image |
+| `videos.upload(file \| url=, ...)` | Upload or securely import an MP4 with visibility, TTL, metadata, folder, collection, idempotency and optional social optimization |
+| `videos.upload_resumable(file, ...)` | Replay-safe multipart upload; rerun with the same idempotency key to resume |
+| `videos.create_upload(...)` / `upload_part(...)` / `complete_upload(...)` / `abort_upload(...)` | Manual resumable-upload lifecycle |
+| `videos.get(id)` / `list(...)` / `list_all(...)` / `delete(id)` | Video discovery and lifecycle |
+| `videos.update(id, metadata=, folder=, collection_id=)` | Replace metadata and organization fields; pass `None` to clear |
+| `videos.sign_url(id, expires_in=)` | Fresh private original, poster and available artifact URLs |
+| `videos.optimize(id)` / `enrich(id)` | Start asynchronous optimization or transcript/storyboard enrichment |
+| `videos.wait_for_optimization(id, ...)` / `wait_for_enrichment(id, ...)` | Bounded polling with backoff; returns video, terminal/current status and `timed_out` |
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
 | `register(email)` | Create an account, returns a first key once |
@@ -76,8 +95,9 @@ except PixelVaultError as err:
 ```
 
 The client retries `429` (honoring `Retry-After` up to 30 seconds) and, for `GET`/`DELETE` only, `5xx` and
-network errors. Uploads and `images.generate` are never retried after a `5xx` or a network error, so a lost response cannot create a duplicate image or spend credits twice.
-Tune with `max_retries` (default 2) and `timeout` (seconds, default 60).
+network errors. Uploads, job creation and `images.generate` are not retried after a `5xx` or network error.
+Use an `idempotency_key` for replay-safe video direct/import/resumable uploads. A wait timing out locally does
+not cancel the server job. Tune with `max_retries` (default 2) and `timeout` (seconds, default 60).
 
 ## License
 

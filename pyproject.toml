@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pixelvault"
-version = "0.4.0"
-description = "Official Python SDK for PixelVault, agent-first image hosting"
+version = "0.5.0"
+description = "Official Python SDK for PixelVault, agent-first media hosting"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.9"
 authors = [{ name = "PixelVault" }]
-keywords = ["pixelvault", "image-hosting", "sdk", "upload", "agent"]
+keywords = ["pixelvault", "media-hosting", "image-hosting", "video-hosting", "sdk", "upload", "agent"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Typing :: Typed",
