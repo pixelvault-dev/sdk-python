@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import io
 import json
+import time
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import Any, AsyncIterator, BinaryIO, Dict, Iterator, Optional, Tuple
 from urllib.parse import quote
 
 from ._core import FileInput, Request, drop_none
-from .types import Audio, AudioPage, AudioSignedUrl
+from .types import Audio, AudioPage, AudioSignedUrl, AudioWaitResult
 
 _AUDIO_MAX_BYTES = 25_000_000
 
@@ -291,6 +292,33 @@ class AudioFiles:
         )
         return cast(AudioSignedUrl, self._c._send(request)["data"])
 
+    def enrich(self, audio_id: str) -> Audio:
+        """Start or resume transcription for a hosted audio asset."""
+        request = Request("POST", f"/v1/audio/{_seg(audio_id)}/enrich")
+        return cast(Audio, self._c._send(request)["data"])
+
+    def wait_for_enrichment(
+        self,
+        audio_id: str,
+        *,
+        timeout: float = 600.0,
+        interval: float = 1.0,
+        max_interval: float = 5.0,
+    ) -> AudioWaitResult:
+        """Poll with backoff; a local timeout never cancels the server job."""
+        deadline = time.monotonic() + timeout
+        delay = interval
+        while True:
+            audio = self.get(audio_id)
+            status = audio["enrichment"]["status"]
+            if status not in ("pending", "processing"):
+                return {"audio": audio, "status": status, "timed_out": False}
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return {"audio": audio, "status": status, "timed_out": True}
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 1.5, max_interval)
+
 
 class AsyncAudioFiles:
     def __init__(self, client: Any) -> None:
@@ -405,3 +433,30 @@ class AsyncAudioFiles:
             json=drop_none({"expires_in": expires_in}),
         )
         return cast(AudioSignedUrl, (await self._c._send(request))["data"])
+
+    async def enrich(self, audio_id: str) -> Audio:
+        """Start or resume transcription for a hosted audio asset."""
+        request = Request("POST", f"/v1/audio/{_seg(audio_id)}/enrich")
+        return cast(Audio, (await self._c._send(request))["data"])
+
+    async def wait_for_enrichment(
+        self,
+        audio_id: str,
+        *,
+        timeout: float = 600.0,
+        interval: float = 1.0,
+        max_interval: float = 5.0,
+    ) -> AudioWaitResult:
+        """Poll with backoff; a local timeout never cancels the server job."""
+        deadline = time.monotonic() + timeout
+        delay = interval
+        while True:
+            audio = await self.get(audio_id)
+            status = audio["enrichment"]["status"]
+            if status not in ("pending", "processing"):
+                return {"audio": audio, "status": status, "timed_out": False}
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return {"audio": audio, "status": status, "timed_out": True}
+            await asyncio.sleep(min(delay, remaining))
+            delay = min(delay * 1.5, max_interval)
