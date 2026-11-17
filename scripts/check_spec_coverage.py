@@ -14,7 +14,7 @@ COVERED = {
     "register_account", "device_login_start", "device_login_complete",
     "list_videos", "upload_video", "get_video", "delete_video", "update_video", "optimize_video",
     "enrich_video", "analyze_video", "generate_video_poster", "sign_video_url",
-    "upload_audio", "list_audio", "get_audio", "update_audio", "sign_audio_url", "delete_audio",
+    "upload_audio", "list_audio", "get_audio", "update_audio", "sign_audio_url", "delete_audio", "enrich_audio",
     "create_video_upload", "upload_video_part", "complete_video_upload", "abort_video_upload",
     "start_export", "get_export_job", "download_export",
 }
@@ -29,7 +29,7 @@ IGNORED = {
     "start_checkout", "open_billing_portal",
     "list_collections", "get_collection", "close_collection",
     # Advanced image, webhook, and anonymous-playground surfaces are intentionally separate.
-    "describe_image", "edit_image", "list_image_tags", "playground_video_upload",
+    "describe_image", "edit_image", "list_image_tags", "playground_video_upload", "playground_audio_upload",
     "list_webhooks", "create_webhook", "update_webhook", "delete_webhook",
     "rotate_webhook_secret", "list_webhook_deliveries",
 
