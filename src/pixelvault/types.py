@@ -189,6 +189,29 @@ class VideoPage(TypedDict):
     meta: ListMeta
 
 
+AudioEnrichmentStatus = Literal["not_requested", "pending", "processing", "complete", "failed"]
+
+
+class AudioTranscript(TypedDict):
+    status: Literal["complete"]
+    text_url: NotRequired[str]
+    vtt_url: NotRequired[str]
+    segments_url: NotRequired[str]
+    language: NotRequired[Optional[str]]
+    languages: NotRequired[List[str]]
+    model: NotRequired[Optional[str]]
+    segment_count: NotRequired[int]
+
+
+class AudioEnrichment(TypedDict):
+    status: AudioEnrichmentStatus
+    job_id: NotRequired[str]
+    requested_at: NotRequired[str]
+    completed_at: NotRequired[Optional[str]]
+    transcript: NotRequired[Optional[AudioTranscript]]
+    error: NotRequired[Dict[str, str]]
+
+
 class Audio(TypedDict):
     id: str
     kind: Literal["audio"]
@@ -206,6 +229,7 @@ class Audio(TypedDict):
     folder: Optional[str]
     collection_id: Optional[str]
     metadata: Optional[Dict[str, Any]]
+    enrichment: AudioEnrichment
     created_at: str
     expires_at: NotRequired[str]
     temporary: NotRequired[bool]
@@ -220,8 +244,16 @@ class AudioPage(TypedDict):
 
 class AudioSignedUrl(TypedDict):
     url: str
+    original_url: str
     expires: int
     visibility: Literal["public", "private"]
+    enrichment: AudioEnrichment
+
+
+class AudioWaitResult(TypedDict):
+    audio: Audio
+    status: AudioEnrichmentStatus
+    timed_out: bool
 
 
 class VideoUploadSession(TypedDict):

@@ -700,6 +700,7 @@ AUDIO = {
     "folder": None,
     "collection_id": None,
     "metadata": None,
+    "enrichment": {"status": "not_requested"},
     "created_at": "2026-11-16T00:00:00Z",
 }
 
@@ -755,8 +756,10 @@ def test_audio_import_lifecycle_filters_signing_and_delete():
                 json={
                     "data": {
                         "url": "https://signed.example/audio.mp3?sig=x",
+                        "original_url": "https://signed.example/audio.mp3?sig=x",
                         "expires": 123,
                         "visibility": "private",
+                        "enrichment": {"status": "not_requested"},
                     }
                 },
             )
@@ -788,6 +791,40 @@ def test_audio_import_lifecycle_filters_signing_and_delete():
     assert signed["expires"] == 123
 
 
+def test_audio_starts_and_waits_for_transcription_with_resumable_timeout():
+    calls = []
+    responses = [
+        {**AUDIO, "enrichment": {"job_id": "aen_1", "status": "processing"}},
+        {
+            **AUDIO,
+            "enrichment": {
+                "job_id": "aen_1",
+                "status": "complete",
+                "transcript": {
+                    "status": "complete",
+                    "text_url": "https://img.pixelvault.dev/p/aud_1.transcript.txt",
+                },
+            },
+        },
+        {**AUDIO, "enrichment": {"job_id": "aen_1", "status": "processing"}},
+    ]
+
+    def handler(req):
+        calls.append(req)
+        return httpx.Response(202 if req.method == "POST" else 200, json={"data": responses.pop(0)})
+
+    pv = make(handler)
+    started = pv.audio.enrich("aud/1")
+    completed = pv.audio.wait_for_enrichment("aud_1", timeout=0)
+    timed_out = pv.audio.wait_for_enrichment("aud_1", timeout=0)
+
+    assert started["enrichment"]["job_id"] == "aen_1"
+    assert completed["status"] == "complete" and completed["timed_out"] is False
+    assert completed["audio"]["enrichment"]["transcript"]["text_url"].endswith(".txt")
+    assert timed_out["status"] == "processing" and timed_out["timed_out"] is True
+    assert calls[0].url.raw_path == b"/v1/audio/aud%2F1/enrich"
+
+
 @pytest.mark.asyncio
 async def test_async_audio_upload_and_get():
     calls = []
@@ -801,6 +838,23 @@ async def test_async_audio_upload_and_get():
         fetched = await pv.audio.get("aud_1")
     assert imported["id"] == fetched["id"] == "aud_1"
     assert calls[0].url.path == "/v1/audio"
+
+
+@pytest.mark.asyncio
+async def test_async_audio_enrich_and_wait():
+    responses = [
+        {**AUDIO, "enrichment": {"job_id": "aen_1", "status": "pending"}},
+        {**AUDIO, "enrichment": {"job_id": "aen_1", "status": "failed"}},
+    ]
+
+    def handler(req):
+        return httpx.Response(202 if req.method == "POST" else 200, json={"data": responses.pop(0)})
+
+    async with amake(handler) as pv:
+        started = await pv.audio.enrich("aud_1")
+        result = await pv.audio.wait_for_enrichment("aud_1", timeout=0)
+    assert started["enrichment"]["status"] == "pending"
+    assert result["status"] == "failed" and result["timed_out"] is False
 
 
 def test_audio_rejects_an_unknown_direct_format_before_network_io():

@@ -49,8 +49,15 @@ audio = pv.audio.upload(
     expires_in=604800,
     idempotency_key="episode-v1",
 )
-print(audio["id"], audio["url"], audio["codec"], audio["duration_seconds"])
+started = pv.audio.enrich(audio["id"])
+print(started["id"], started["enrichment"]["job_id"])
+audio_result = pv.audio.wait_for_enrichment(audio["id"], timeout=600)
+if audio_result["timed_out"]:
+    print("resume later with", audio["id"])
+elif audio_result["status"] == "complete":
+    print(audio_result["audio"]["enrichment"].get("transcript"))
 fresh = pv.audio.sign_url(audio["id"], expires_in=3600)
+print(fresh["original_url"], fresh["enrichment"].get("transcript"))
 ```
 
 Asyncio:
@@ -85,19 +92,23 @@ async with AsyncPixelVault() as pv:
 | `videos.optimize(id)` / `enrich(id)` | Start asynchronous optimization or transcript/storyboard enrichment |
 | `videos.wait_for_optimization(id, ...)` / `wait_for_enrichment(id, ...)` | Bounded polling with backoff; returns video, terminal/current status and `timed_out` |
 | `audio.upload(file \| url=, ...)` | Host original MP3, PCM/float WAV, AAC M4A, or Opus/Vorbis OGG with privacy, TTL, metadata, organization, and retry safety |
-| `audio.get(id)` / `list(...)` / `list_all(...)` / `delete(id)` | Audio discovery and lifecycle by stable `aud_` ID |
-| `audio.update(id, metadata=, folder=, collection_id=)` / `sign_url(id, expires_in=)` | Replace organization fields or mint a fresh private original URL |
+| `audio.enrich(id)` / `wait_for_enrichment(id, ...)` | Start/resume transcription and poll with bounded backoff for text, WebVTT, and timestamped JSON; local timeout never cancels the job |
+| `audio.get(id)` / `list(...)` / `list_all(...)` / `delete(id)` | Audio and transcript discovery/lifecycle by stable `aud_` ID |
+| `audio.update(id, metadata=, folder=, collection_id=)` / `sign_url(id, expires_in=)` | Replace organization fields or mint fresh private original/transcript URLs |
 | `exports.start()` / `wait(job_id)` / `download(job_id)` | Owner-authenticated tar export of non-expired images, videos, audio originals, available derivatives and `manifest.json` relationships |
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
 | `register(email)` | Create an account, returns a first key once |
 | `device_login_start(email)` + `device_login_complete(email, code)` | Passwordless key minting |
 
-Audio originals have an approved global maximum of 25,000,000 bytes; this is not
-a plan allowance. PixelVault validates actual container/codec bytes and preserves
-the original without transcoding. Audio editing, conversion, streaming manifests,
-and transcription are intentionally unsupported. Sync and asyncio clients expose
-the same audio methods.
+Audio originals and enrichment sources have an approved global maximum of
+25,000,000 bytes; enrichment additionally accepts up to 10 minutes. The file
+ceiling is not a plan allowance. PixelVault validates actual container/codec
+bytes and preserves the original without transcoding. Audio and video
+enrichment share the existing plan allowance. Audio editing, conversion,
+streaming manifests, summaries, chapters, show notes, promo copy, and
+storyboards remain unsupported. Sync and asyncio clients expose the same audio
+methods.
 
 ## Errors and retries
 
