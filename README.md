@@ -16,7 +16,7 @@ pv = PixelVault()  # reads PIXELVAULT_API_KEY, or pass api_key="pv_live_..."
 
 # A path, bytes or a binary file object
 image = pv.images.upload("screenshot.png")
-print(image["url"])  # https://img.pixelvault.dev/...
+print(image.get("branded_url", image["url"]))  # custom domain when ready, canonical fallback
 
 # Import from a URL, auto-delete after one hour
 pv.images.upload(url="https://example.com/a.png", expires_in=3600)
@@ -98,6 +98,7 @@ async with AsyncPixelVault() as pv:
 | `exports.start()` / `wait(job_id)` / `download(job_id)` | Owner-authenticated tar export of non-expired images, videos, audio originals, available derivatives and `manifest.json` relationships |
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
+| `custom_domains.list()` / `.create(hostname)` / `.refresh(id)` / `.delete(id)` | Manage the active project's custom domains and inspect account plan capacity |
 | `register(email)` | Create an account, returns a first key once |
 | `device_login_start(email)` + `device_login_complete(email, code)` | Passwordless key minting |
 
@@ -109,6 +110,8 @@ enrichment share the existing plan allowance. Audio editing, conversion,
 streaming manifests, summaries, chapters, show notes, promo copy, and
 storyboards remain unsupported. Sync and asyncio clients expose the same audio
 methods.
+
+Media responses retain canonical `url` and include optional `branded_url` when the active project has a ready custom domain. Use the returned branded value; signed and transform query parameters are preserved.
 
 ## Errors and retries
 

@@ -22,6 +22,7 @@ from .errors import PixelVaultError
 from .videos import AsyncVideos, Videos
 from .audio import AsyncAudioFiles, AudioFiles
 from .exports import AsyncExports, Exports
+from .custom_domains import AsyncCustomDomains, CustomDomains
 from .types import (
     ApiKey,
     CreatedKey,
@@ -92,6 +93,7 @@ class PixelVault:
         self.audio = AudioFiles(self)
         self.usage = _Usage(self)
         self.keys = _Keys(self)
+        self.custom_domains = CustomDomains(self)
 
     def __enter__(self) -> "PixelVault":
         return self
@@ -329,6 +331,7 @@ class AsyncPixelVault:
         self.audio = AsyncAudioFiles(self)
         self.usage = _AsyncUsage(self)
         self.keys = _AsyncKeys(self)
+        self.custom_domains = AsyncCustomDomains(self)
 
     async def __aenter__(self) -> "AsyncPixelVault":
         return self

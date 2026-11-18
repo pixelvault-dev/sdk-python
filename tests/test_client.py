@@ -963,3 +963,48 @@ async def test_async_exports_timeout_is_local():
         started = await pv.exports.start()
         result = await pv.exports.wait(started["job_id"], timeout=0)
     assert result["job"]["status"] == "processing" and result["timed_out"] is True
+
+def test_custom_domains_manage_encoded_ids_and_capacity():
+    seen = []
+    domain = {
+        "id": "dom/1",
+        "project_id": "proj_1",
+        "hostname": "media.example.com",
+        "status": "active",
+        "hostname_status": "active",
+        "certificate_status": "active",
+        "ready": True,
+        "cname_target": "custom.pvcdn.dev",
+        "ownership_verification": None,
+        "created_at": "2026-11-18T00:00:00Z",
+        "updated_at": "2026-11-18T00:00:00Z",
+    }
+
+    def handler(req):
+        seen.append(req)
+        if req.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "data": [domain],
+                    "meta": {
+                        "limit": 1,
+                        "total": 1,
+                        "project_total": 1,
+                        "cname_target": "custom.pvcdn.dev",
+                    },
+                },
+            )
+        if req.method == "DELETE":
+            return httpx.Response(200, json={"data": {"id": "dom/1", "deleted": True}})
+        return httpx.Response(200, json={"data": domain})
+
+    domains = make(handler).custom_domains
+    assert domains.list()["meta"]["limit"] == 1
+    assert domains.create("media.example.com")["ready"] is True
+    assert domains.refresh("dom/1")["hostname"] == "media.example.com"
+    domains.delete("dom/1")
+
+    assert json.loads(seen[1].content) == {"hostname": "media.example.com"}
+    assert str(seen[2].url).endswith("/v1/custom-domains/dom%2F1/refresh")
+    assert str(seen[3].url).endswith("/v1/custom-domains/dom%2F1")
