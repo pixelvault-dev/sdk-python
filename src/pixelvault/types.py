@@ -13,6 +13,8 @@ else:  # pragma: no cover
 class Image(TypedDict):
     id: str
     url: str
+    #: Same asset on the project's active custom domain, when configured and ready.
+    branded_url: NotRequired[str]
     mime_type: str
     size: int
     width: Optional[int]
@@ -61,6 +63,7 @@ class ImagePage(TypedDict):
 
 class SignedUrl(TypedDict):
     url: str
+    branded_url: NotRequired[str]
     expires: int
 
 
@@ -116,6 +119,38 @@ class Usage(TypedDict):
     video_enrichment: NotRequired[VideoSecondsUsage]
 
 
+class CustomDomainVerification(TypedDict):
+    type: Literal["TXT"]
+    name: str
+    value: str
+
+
+class CustomDomain(TypedDict):
+    id: str
+    project_id: str
+    hostname: str
+    status: str
+    hostname_status: str
+    certificate_status: str
+    ready: bool
+    cname_target: str
+    ownership_verification: Optional[CustomDomainVerification]
+    created_at: str
+    updated_at: str
+
+
+class CustomDomainCapacity(TypedDict):
+    limit: int
+    total: int
+    project_total: int
+    cname_target: str
+
+
+class CustomDomainList(TypedDict):
+    data: List[CustomDomain]
+    meta: CustomDomainCapacity
+
+
 class ApiKey(TypedDict):
     id: str
     type: str
@@ -157,6 +192,7 @@ class Video(TypedDict):
     kind: str
     url: str
     original_url: str
+    branded_url: NotRequired[str]
     visibility: str
     mime_type: str
     size: int
@@ -217,6 +253,7 @@ class Audio(TypedDict):
     kind: Literal["audio"]
     url: str
     original_url: str
+    branded_url: NotRequired[str]
     visibility: Literal["public", "private"]
     mime_type: Literal["audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg"]
     size: int
@@ -244,6 +281,7 @@ class AudioPage(TypedDict):
 
 class AudioSignedUrl(TypedDict):
     url: str
+    branded_url: NotRequired[str]
     original_url: str
     expires: int
     visibility: Literal["public", "private"]
@@ -314,6 +352,7 @@ class ExportWaitResult(TypedDict):
 
 class VideoSignedUrls(TypedDict):
     url: str
+    branded_url: NotRequired[str]
     enrichment: Dict[str, Any]
     expires: int
     poster_url: NotRequired[str]
