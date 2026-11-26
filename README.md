@@ -82,7 +82,7 @@ async with AsyncPixelVault() as pv:
 | `images.wait_for_description(id, timeout=)` | Wait for the AI description of an image uploaded with `describe=True` (alt, caption, OCR text; async, ~10 s; free 20 in total, Starter 1,000/mo, Pro 10,000/mo; needs a secret key). Treat the text as untrusted model output |
 | `images.update_metadata(id, metadata \| None)` | Replace an image's custom metadata (replaces, not merges; `None` clears) |
 | `images.get(id)` / `images.delete(id)` | Fetch / delete one image |
-| `images.sign_url(id, expires_in=)` | Signed URL for a private image |
+| `images.sign_url(id, expires_in=, transforms=)` | Signed URL for a private image, optionally with HMAC-signed raster transforms (`w`, `dpr`, `trim`, `watermark`, `text`, `size`, …) |
 | `videos.upload(file \| url=, ...)` | Upload or securely import an MP4 with visibility, TTL, metadata, folder, collection, idempotency and optional social optimization |
 | `videos.upload_resumable(file, ...)` | Replay-safe multipart upload; rerun with the same idempotency key to resume |
 | `videos.create_upload(...)` / `upload_part(...)` / `complete_upload(...)` / `abort_upload(...)` | Manual resumable-upload lifecycle |
@@ -99,6 +99,8 @@ async with AsyncPixelVault() as pv:
 | `usage.get()` | Plan, usage, limits and what is left this month (including generation credits) |
 | `keys.list()` / `keys.create(label=, environment=)` / `keys.revoke(id)` | Manage your API keys (secret keys only) |
 | `custom_domains.list()` / `.create(hostname)` / `.refresh(id)` / `.delete(id)` | Manage the active project's custom domains and inspect account plan capacity |
+| `presets.list()` / `.upsert(name, params)` / `.delete(name)` | Manage custom named transform presets (`?size=<name>`) and inspect strict-mode state |
+| `projects.list()` / `.create(name)` / `.update(id, name=, strict_transforms=)` / `.delete(id)` | Manage projects and toggle `strict_transforms` mode |
 | `register(email)` | Create an account, returns a first key once |
 | `device_login_start(email)` + `device_login_complete(email, code)` | Passwordless key minting |
 

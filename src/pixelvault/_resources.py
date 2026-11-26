@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Mapping, Optional, cast
 from urllib.parse import quote
 
 from ._core import Request, batch_request, drop_none, upload_request
@@ -52,8 +52,17 @@ def delete_image(image_id: str) -> Request:
     return Request("DELETE", f"/v1/images/{seg(image_id)}")
 
 
-def sign_url(image_id: str, expires_in: Optional[int]) -> Request:
-    body = drop_none({"expires_in": expires_in})
+def sign_url(
+    image_id: str,
+    expires_in: Optional[int],
+    transforms: Optional[Mapping[str, Any]] = None,
+) -> Request:
+    body = drop_none(
+        {
+            "expires_in": expires_in,
+            "transforms": dict(transforms) if transforms is not None else None,
+        }
+    )
     return Request("POST", f"/v1/images/{seg(image_id)}/sign-url", json=body)
 
 

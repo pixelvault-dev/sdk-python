@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, List, Mapping, Optional
 
 import httpx
 
@@ -23,6 +23,8 @@ from .videos import AsyncVideos, Videos
 from .audio import AsyncAudioFiles, AudioFiles
 from .exports import AsyncExports, Exports
 from .custom_domains import AsyncCustomDomains, CustomDomains
+from .presets import AsyncPresets, Presets
+from .projects import AsyncProjects, Projects
 from .types import (
     ApiKey,
     CreatedKey,
@@ -94,6 +96,8 @@ class PixelVault:
         self.usage = _Usage(self)
         self.keys = _Keys(self)
         self.custom_domains = CustomDomains(self)
+        self.presets = Presets(self)
+        self.projects = Projects(self)
 
     def __enter__(self) -> "PixelVault":
         return self
@@ -279,9 +283,18 @@ class _Images:
     def delete(self, image_id: str) -> None:
         self._c._send(r.delete_image(image_id))
 
-    def sign_url(self, image_id: str, expires_in: Optional[int] = None) -> SignedUrl:
-        """Signed URL for a private image (60-2592000 seconds, default 3600)."""
-        return r.data(self._c._send(r.sign_url(image_id, expires_in)))  # type: ignore[no-any-return]
+    def sign_url(
+        self,
+        image_id: str,
+        expires_in: Optional[int] = None,
+        *,
+        transforms: Optional[Mapping[str, Any]] = None,
+    ) -> SignedUrl:
+        """Signed URL for a private image (60-2592000 seconds, default 3600).
+
+        Pass ``transforms`` (e.g. ``{"w": 800, "fmt": "auto"}``) to sign raster transforms into the URL.
+        """
+        return r.data(self._c._send(r.sign_url(image_id, expires_in, transforms)))  # type: ignore[no-any-return]
 
 
 class _Usage:
@@ -332,6 +345,8 @@ class AsyncPixelVault:
         self.usage = _AsyncUsage(self)
         self.keys = _AsyncKeys(self)
         self.custom_domains = AsyncCustomDomains(self)
+        self.presets = AsyncPresets(self)
+        self.projects = AsyncProjects(self)
 
     async def __aenter__(self) -> "AsyncPixelVault":
         return self
@@ -480,8 +495,14 @@ class _AsyncImages:
     async def delete(self, image_id: str) -> None:
         await self._c._send(r.delete_image(image_id))
 
-    async def sign_url(self, image_id: str, expires_in: Optional[int] = None) -> SignedUrl:
-        return r.data(await self._c._send(r.sign_url(image_id, expires_in)))  # type: ignore[no-any-return]
+    async def sign_url(
+        self,
+        image_id: str,
+        expires_in: Optional[int] = None,
+        *,
+        transforms: Optional[Mapping[str, Any]] = None,
+    ) -> SignedUrl:
+        return r.data(await self._c._send(r.sign_url(image_id, expires_in, transforms)))  # type: ignore[no-any-return]
 
 
 class _AsyncUsage:
