@@ -65,6 +65,45 @@ class SignedUrl(TypedDict):
     url: str
     branded_url: NotRequired[str]
     expires: int
+    expires_at: NotRequired[str]
+    transforms: NotRequired[Dict[str, Any]]
+
+
+class TransformPreset(TypedDict):
+    name: str
+    params: Dict[str, Any]
+    created_at: str
+    updated_at: str
+
+
+class TransformPresetMeta(TypedDict):
+    limit: int
+    total: int
+    strict_transforms: bool
+    builtin_presets: List[str]
+
+
+class TransformPresetList(TypedDict):
+    data: List[TransformPreset]
+    meta: TransformPresetMeta
+
+
+class Project(TypedDict):
+    id: str
+    name: str
+    strict_transforms: bool
+    created_at: str
+    current: NotRequired[bool]
+
+
+class ProjectListMeta(TypedDict):
+    limit: int
+    total: int
+
+
+class ProjectList(TypedDict):
+    data: List[Project]
+    meta: ProjectListMeta
 
 
 class UsageCounts(TypedDict):
